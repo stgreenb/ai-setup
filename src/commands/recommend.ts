@@ -65,8 +65,8 @@ function getInstalledSkills(): Set<string> {
 // --- Search providers ---
 
 async function searchSkillsSh(technologies: string[]): Promise<SkillResult[]> {
-  const results: SkillResult[] = [];
-  const seen = new Set<string>();
+  // Track best result per skillId (prefer highest installs)
+  const bestBySlug = new Map<string, SkillResult & { installs: number }>();
 
   for (const tech of technologies) {
     try {
@@ -80,9 +80,10 @@ async function searchSkillsSh(technologies: string[]): Promise<SkillResult[]> {
       if (!data.skills?.length) continue;
 
       for (const skill of data.skills) {
-        if (seen.has(skill.skillId)) continue;
-        seen.add(skill.skillId);
-        results.push({
+        const existing = bestBySlug.get(skill.skillId);
+        if (existing && existing.installs >= (skill.installs ?? 0)) continue;
+
+        bestBySlug.set(skill.skillId, {
           name: skill.name,
           slug: skill.skillId,
           source_url: skill.source ? `https://github.com/${skill.source}` : '',
@@ -90,6 +91,7 @@ async function searchSkillsSh(technologies: string[]): Promise<SkillResult[]> {
           reason: skill.description || '',
           detected_technology: tech,
           item_type: 'skill',
+          installs: skill.installs ?? 0,
         });
       }
     } catch {
@@ -97,7 +99,7 @@ async function searchSkillsSh(technologies: string[]): Promise<SkillResult[]> {
     }
   }
 
-  return results;
+  return Array.from(bestBySlug.values());
 }
 
 async function searchTessl(technologies: string[]): Promise<SkillResult[]> {
@@ -191,8 +193,10 @@ async function searchAllProviders(technologies: string[], platform?: string): Pr
   const combined: SkillResult[] = [];
   for (const batch of results) {
     for (const result of batch) {
-      if (seen.has(result.slug)) continue;
-      seen.add(result.slug);
+      // Normalize for dedup: strip hyphens/underscores so "zod-4" and "zod4" merge
+      const key = result.name.toLowerCase().replace(/[-_]/g, '');
+      if (seen.has(key)) continue;
+      seen.add(key);
       combined.push(result);
     }
   }
@@ -516,25 +520,44 @@ async function interactiveSelect(recs: SkillResult[]): Promise<SkillResult[] | n
 // --- Content fetching & install ---
 
 async function fetchSkillContent(rec: SkillResult): Promise<string | null> {
-  try {
-    const resp = await fetch(`https://skills.sh/api/skills/${rec.slug}`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (resp.ok) {
-      const data = await resp.json() as Record<string, unknown>;
-      const content = (data.content as string) || (data.text as string);
-      if (content) return content;
-    }
-  } catch {}
+  if (!rec.source_url) return null;
 
-  if (rec.source_url) {
+  const repoPath = rec.source_url.replace('https://github.com/', '');
+
+  // Try common skill file locations in the source repo
+  const candidates = [
+    `https://raw.githubusercontent.com/${repoPath}/HEAD/skills/${rec.slug}/SKILL.md`,
+    `https://raw.githubusercontent.com/${repoPath}/HEAD/${rec.slug}/SKILL.md`,
+    `https://raw.githubusercontent.com/${repoPath}/HEAD/.claude/skills/${rec.slug}/SKILL.md`,
+  ];
+
+  for (const url of candidates) {
     try {
-      const repoPath = rec.source_url.replace('https://github.com/', '');
-      const url = `https://raw.githubusercontent.com/${repoPath}/HEAD/skills/${rec.slug}/SKILL.md`;
       const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-      if (resp.ok) return await resp.text();
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text.length > 20) return text;
+      }
     } catch {}
   }
+
+  // Fallback: search the repo tree for the SKILL.md file via GitHub API
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${repoPath}/git/trees/HEAD?recursive=1`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (resp.ok) {
+      const tree = await resp.json() as { tree?: Array<{ path: string }> };
+      const needle = `${rec.slug}/SKILL.md`;
+      const match = tree.tree?.find(f => f.path.endsWith(needle));
+      if (match) {
+        const rawUrl = `https://raw.githubusercontent.com/${repoPath}/HEAD/${match.path}`;
+        const contentResp = await fetch(rawUrl, { signal: AbortSignal.timeout(10_000) });
+        if (contentResp.ok) return await contentResp.text();
+      }
+    }
+  } catch {}
 
   return null;
 }
