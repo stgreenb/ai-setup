@@ -20,7 +20,7 @@ import { loadConfig } from '../llm/config.js';
 import { runInteractiveProviderSetup } from './interactive-provider-setup.js';
 import { computeLocalScore } from '../scoring/index.js';
 import { displayScore, displayScoreDelta } from '../scoring/display.js';
-import type { FailingCheck } from '../ai/generate.js';
+import type { FailingCheck, PassingCheck } from '../ai/generate.js';
 
 type TargetAgent = 'claude' | 'cursor' | 'both';
 
@@ -115,12 +115,16 @@ export async function initCommand(options: InitOptions) {
 
   // Determine if this should be a targeted fix (score >= 95 with existing configs)
   let failingChecks: FailingCheck[] | undefined;
+  let passingChecks: PassingCheck[] | undefined;
   let currentScore: number | undefined;
 
   if (hasExistingConfig && baselineScore.score >= 95 && !options.force) {
     failingChecks = baselineScore.checks
       .filter(c => !c.passed && c.maxPoints > 0)
       .map(c => ({ name: c.name, suggestion: c.suggestion }));
+    passingChecks = baselineScore.checks
+      .filter(c => c.passed)
+      .map(c => ({ name: c.name }));
     currentScore = baselineScore.score;
 
     if (failingChecks.length > 0) {
@@ -164,6 +168,7 @@ export async function initCommand(options: InitOptions) {
       },
       failingChecks,
       currentScore,
+      passingChecks,
     );
 
     if (!generatedSetup) {

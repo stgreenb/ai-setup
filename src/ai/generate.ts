@@ -27,9 +27,10 @@ export async function generateSetup(
   callbacks?: GenerateCallbacks,
   failingChecks?: FailingCheck[],
   currentScore?: number,
+  passingChecks?: PassingCheck[],
 ): Promise<{ setup: Record<string, unknown> | null; explanation?: string; raw?: string }> {
   const provider = getProvider();
-  const userMessage = buildGeneratePrompt(fingerprint, targetAgent, prompt, failingChecks, currentScore);
+  const userMessage = buildGeneratePrompt(fingerprint, targetAgent, prompt, failingChecks, currentScore, passingChecks);
 
   let attempt = 0;
 
@@ -145,6 +146,10 @@ export interface FailingCheck {
   suggestion?: string;
 }
 
+export interface PassingCheck {
+  name: string;
+}
+
 const LIMITS = {
   FILE_TREE_ENTRIES: 200,
   EXISTING_CONFIG_CHARS: 8000,
@@ -168,6 +173,7 @@ export function buildGeneratePrompt(
   prompt?: string,
   failingChecks?: FailingCheck[],
   currentScore?: number,
+  passingChecks?: PassingCheck[],
 ): string {
   const parts: string[] = [];
   const existing = fingerprint.existingConfigs;
@@ -186,7 +192,13 @@ export function buildGeneratePrompt(
     for (const check of failingChecks) {
       parts.push(`- ${check.name}${check.suggestion ? `: ${check.suggestion}` : ''}`);
     }
-    parts.push(`\nIMPORTANT: Return the existing CLAUDE.md and skills with MINIMAL changes — only the edits needed to fix the above checks. Do NOT rewrite, restructure, rephrase, or make cosmetic changes. Preserve the existing content as-is except for targeted fixes.`);
+    if (passingChecks && passingChecks.length > 0) {
+      parts.push(`\nThese checks are currently PASSING — do NOT break them:`);
+      for (const check of passingChecks) {
+        parts.push(`- ${check.name}`);
+      }
+    }
+    parts.push(`\nIMPORTANT: Return the existing CLAUDE.md and skills with MINIMAL changes — only the edits needed to fix the above checks. Do NOT rewrite, restructure, rephrase, or make cosmetic changes. Preserve the existing content as-is except for targeted fixes. If a skill file is not related to a failing check, return it EXACTLY as-is, character for character.`);
   } else if (hasExistingConfigs) {
     parts.push(`Audit and improve the existing coding agent configuration for target: ${targetAgent}`);
   } else {
