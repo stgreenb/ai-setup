@@ -1,6 +1,10 @@
+---
+name: adding-a-command
+description: How to add a new CLI command to @rely-ai/caliber. Use when creating new Commander.js subcommands, wiring up LLM calls, using spinners/chalk, or writing command tests.
+---
 # Adding a New CLI Command
 
-Follow this checklist when adding a new command to `@caliber-ai/caliber`.
+Follow this checklist when adding a new command to `@rely-ai/caliber`.
 
 ## 1. Create the command file
 
@@ -36,9 +40,7 @@ export async function myNewCommand(options: { dryRun?: boolean }) {
 - Use `chalk` for coloured output (red = error, green = success, yellow = warning)
 - Throw `new Error('__exit__')` for clean exits (no stack trace)
 
-## 2. Register the command in cli.ts
-
-Add the import and register call in `src/cli.ts`:
+## 2. Register in cli.ts
 
 ```typescript
 import { myNewCommand } from './commands/my-new-command.js';
@@ -55,22 +57,37 @@ program
 ```typescript
 import { llmCall, llmJsonCall } from '../llm/index.js';
 
-// Simple text response
+// Plain text response
 const text = await llmCall({ system: 'You are...', prompt: 'Analyze...' });
 
 // Parsed JSON response
 const result = await llmJsonCall<MyType>({ system: '...', prompt: '...' });
 ```
 
+See the `llm-provider` skill for streaming patterns and adding new providers.
+
 ## 4. Write a test
 
-Create `src/commands/__tests__/my-new-command.test.ts`. The LLM provider is mocked in `src/test/setup.ts`.
+Create `src/commands/__tests__/my-new-command.test.ts`. The LLM provider is globally mocked in `src/test/setup.ts`.
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { myNewCommand } from '../my-new-command.js';
+
+describe('myNewCommand', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('throws __exit__ when no config', async () => {
+    await expect(myNewCommand({})).rejects.toThrow('__exit__');
+  });
+});
+```
 
 ## 5. Update README.md
 
 Add a row to the Commands table in `README.md`.
 
-## 6. Commit with conventional commits
+## 6. Commit
 
 ```bash
 git commit -m "feat: add my-new-command command"

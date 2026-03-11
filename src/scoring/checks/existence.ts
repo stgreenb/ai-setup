@@ -11,6 +11,7 @@ import {
   POINTS_MCP_SERVERS,
   POINTS_CROSS_PLATFORM_PARITY,
 } from '../constants.js';
+import { hasExternalServices } from './coverage.js';
 
 function countFiles(dir: string, pattern: RegExp): string[] {
   try {
@@ -134,22 +135,26 @@ export function checkExistence(dir: string): Check[] {
         : undefined,
   });
 
-  // 5. MCP servers
+  // 5. MCP servers (only penalize if project has external services)
   const mcp = hasMcpServers(dir);
+  const hasServices = hasExternalServices(dir);
+  const mcpPassed = mcp.count >= 1 || !hasServices;
   checks.push({
     id: 'mcp_servers',
     name: 'MCP servers configured',
     category: 'existence',
     maxPoints: POINTS_MCP_SERVERS,
-    earnedPoints: mcp.count >= 1 ? POINTS_MCP_SERVERS : 0,
-    passed: mcp.count >= 1,
+    earnedPoints: mcpPassed ? POINTS_MCP_SERVERS : 0,
+    passed: mcpPassed,
     detail:
-      mcp.count === 0
-        ? 'No MCP servers'
-        : `${mcp.count} server${mcp.count === 1 ? '' : 's'} in ${mcp.sources.join(', ')}`,
+      mcp.count > 0
+        ? `${mcp.count} server${mcp.count === 1 ? '' : 's'} in ${mcp.sources.join(', ')}`
+        : hasServices
+          ? 'No MCP servers (external services detected)'
+          : 'No MCP servers needed (no external services detected)',
     suggestion:
-      mcp.count === 0
-        ? 'Configure MCP servers in .mcp.json'
+      !mcpPassed
+        ? 'Configure MCP servers in .mcp.json for detected external services'
         : undefined,
   });
 

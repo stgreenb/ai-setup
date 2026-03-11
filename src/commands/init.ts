@@ -17,6 +17,8 @@ import { installLearningHooks } from '../lib/learning-hooks.js';
 import { writeState, getCurrentHeadSha } from '../lib/state.js';
 import { SpinnerMessages, GENERATION_MESSAGES, REFINE_MESSAGES } from '../utils/spinner-messages.js';
 import { loadConfig } from '../llm/config.js';
+import { computeLocalScore } from '../scoring/index.js';
+import { displayScoreDelta } from '../scoring/display.js';
 
 type TargetAgent = 'claude' | 'cursor' | 'both';
 
@@ -78,6 +80,9 @@ export async function initCommand(options: InitOptions) {
 
   // Step 3: Determine target agent
   const targetAgent = options.agent || await promptAgent();
+
+  // Baseline score before generation
+  const baselineScore = computeLocalScore(process.cwd(), targetAgent);
 
   // Get project description if empty directory
   const isEmpty = fingerprint.fileTree.length < 3;
@@ -160,8 +165,11 @@ export async function initCommand(options: InitOptions) {
 
   console.log(chalk.dim(`  ${chalk.green(`${staged.newFiles} new`)} / ${chalk.yellow(`${staged.modifiedFiles} modified`)} file${staged.newFiles + staged.modifiedFiles !== 1 ? 's' : ''}\n`));
 
-  const reviewMethod = await promptReviewMethod();
-  openReview(reviewMethod, staged.stagedFiles);
+  const wantsReview = await promptWantsReview();
+  if (wantsReview) {
+    const reviewMethod = await promptReviewMethod();
+    openReview(reviewMethod, staged.stagedFiles);
+  }
 
   let action = await promptReviewAction();
 
@@ -175,8 +183,12 @@ export async function initCommand(options: InitOptions) {
     const updatedFiles = collectSetupFiles(generatedSetup);
     const restaged = stageFiles(updatedFiles, process.cwd());
     console.log(chalk.dim(`  ${chalk.green(`${restaged.newFiles} new`)} / ${chalk.yellow(`${restaged.modifiedFiles} modified`)} file${restaged.newFiles + restaged.modifiedFiles !== 1 ? 's' : ''}\n`));
-    openReview(reviewMethod, restaged.stagedFiles);
     printSetupSummary(generatedSetup);
+    const wantsReviewAgain = await promptWantsReview();
+    if (wantsReviewAgain) {
+      const reviewMethod = await promptReviewMethod();
+      openReview(reviewMethod, restaged.stagedFiles);
+    }
     action = await promptReviewAction();
   }
 
@@ -218,16 +230,30 @@ export async function initCommand(options: InitOptions) {
     throw new Error('__exit__');
   }
 
+  // Generate AGENTS.md if it doesn't exist
+  if (!fs.existsSync('AGENTS.md')) {
+    const agentsContent = '# AGENTS.md\n\nThis project uses AI coding agents. See CLAUDE.md for Claude Code configuration and .cursor/rules/ for Cursor rules.\n';
+    fs.writeFileSync('AGENTS.md', agentsContent);
+    console.log(`  ${chalk.green('✓')} AGENTS.md`);
+  }
+
+  // Ensure permissions.allow exists in .claude/settings.json
+  ensurePermissions();
+
+  // Save target agent to state
+  const sha = getCurrentHeadSha();
+  writeState({
+    lastRefreshSha: sha ?? '',
+    lastRefreshTimestamp: new Date().toISOString(),
+    targetAgent,
+  });
+
   // Auto-install refresh hook for Claude Code users
   if (targetAgent === 'claude' || targetAgent === 'both') {
     const hookResult = installHook();
     if (hookResult.installed) {
       console.log(`  ${chalk.green('✓')} Auto-refresh hook installed — docs update on Claude Code session end`);
       console.log(chalk.dim('    Run `caliber hooks remove` to disable'));
-      const sha = getCurrentHeadSha();
-      if (sha) {
-        writeState({ lastRefreshSha: sha, lastRefreshTimestamp: new Date().toISOString() });
-      }
     } else if (hookResult.alreadyInstalled) {
       console.log(chalk.dim('  Auto-refresh hook already installed'));
     }
@@ -241,8 +267,12 @@ export async function initCommand(options: InitOptions) {
     }
   }
 
-  console.log(chalk.bold.green('\nSetup complete! Your coding agent is now configured.'));
-  console.log(chalk.dim('Run `caliber undo` to revert changes.\n'));
+  // Show score improvement
+  const afterScore = computeLocalScore(process.cwd(), targetAgent);
+  displayScoreDelta(baselineScore, afterScore);
+
+  console.log(chalk.bold.green('  Setup complete! Your coding agent is now configured.'));
+  console.log(chalk.dim('  Run `caliber undo` to revert changes.\n'));
 
   console.log(chalk.bold('  Next steps:\n'));
   console.log(`    ${chalk.hex('#6366f1')('caliber undo')}         Revert all changes from this run`);
@@ -309,6 +339,17 @@ async function promptAgent(): Promise<TargetAgent> {
       { name: 'Both', value: 'both' as const },
     ],
   });
+}
+
+async function promptWantsReview(): Promise<boolean> {
+  const answer = await select({
+    message: 'Would you like to review the diffs before deciding?',
+    choices: [
+      { name: 'Yes, show me the diffs', value: true },
+      { name: 'No, continue', value: false },
+    ],
+  });
+  return answer;
 }
 
 async function promptReviewMethod(): Promise<ReviewMethod> {
@@ -455,6 +496,33 @@ function printSetupSummary(setup: Record<string, unknown>) {
 function buildSkillContent(skill: { name: string; description: string; content: string }): string {
   const frontmatter = `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n\n`;
   return frontmatter + skill.content;
+}
+
+function ensurePermissions(): void {
+  const settingsPath = '.claude/settings.json';
+  let settings: Record<string, unknown> = {};
+
+  try {
+    if (fs.existsSync(settingsPath)) {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    }
+  } catch { /* not valid JSON, start fresh */ }
+
+  const permissions = (settings.permissions ?? {}) as Record<string, unknown>;
+  const allow = permissions.allow as unknown[] | undefined;
+
+  if (Array.isArray(allow) && allow.length > 0) return;
+
+  permissions.allow = [
+    'Bash(npm run *)',
+    'Bash(npx vitest *)',
+    'Bash(npx tsc *)',
+    'Bash(git *)',
+  ];
+  settings.permissions = permissions;
+
+  if (!fs.existsSync('.claude')) fs.mkdirSync('.claude', { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
 function collectSetupFiles(setup: Record<string, unknown>): Array<{ path: string; content: string }> {

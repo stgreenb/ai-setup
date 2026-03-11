@@ -61,6 +61,12 @@ function formatCheck(check: Check): string {
 export function displayScore(result: ScoreResult): void {
   const gc = gradeColor(result.grade);
 
+  const agentLabel = result.targetAgent === 'both'
+    ? 'Claude Code + Cursor'
+    : result.targetAgent === 'claude'
+      ? 'Claude Code'
+      : 'Cursor';
+
   // Header box
   console.log('');
   console.log(chalk.gray('  ╭───────────────────────────────────────────────────╮'));
@@ -73,6 +79,7 @@ export function displayScore(result: ScoreResult): void {
     '   ' + chalk.gray('│')
   );
   console.log(chalk.gray('  │') + `   ${progressBar(result.score, result.maxScore)}   ` + chalk.gray('│'));
+  console.log(chalk.gray('  │') + chalk.dim(`   Target: ${agentLabel}`) + ' '.repeat(Math.max(1, 40 - agentLabel.length)) + chalk.gray('│'));
   console.log(chalk.gray('  │') + '                                                   ' + chalk.gray('│'));
   console.log(chalk.gray('  ╰───────────────────────────────────────────────────╯'));
   console.log('');

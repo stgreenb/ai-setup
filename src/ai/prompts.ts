@@ -67,8 +67,40 @@ The "fileDescriptions" object MUST include a one-liner for every file that will 
 
 The "deletions" array should list files that should be removed (e.g. duplicate skills, stale configs). Include a reason for each. Omit the array or leave empty if nothing should be deleted.
 
+SCORING CRITERIA — your output is scored deterministically. Optimize for 100/100:
+
+Existence (25 pts):
+- CLAUDE.md exists (6 pts) — always generate
+- Skills configured (8 pts) — 2-3 focused skills is optimal
+- MCP servers mentioned (3 pts) — reference detected MCP integrations
+- For "both" target: .cursorrules/.cursor/rules/ exist (3+3 pts), cross-platform parity (2 pts)
+
+Quality (25 pts):
+- Build/test/lint commands documented (8 pts) — include actual npm/make/cargo commands
+- Concise context files (6 pts) — keep CLAUDE.md under 100 lines for full points (200=4pts, 300=3pts, 500+=0pts)
+- No vague instructions (4 pts) — avoid "follow best practices", "write clean code", "ensure quality"
+- No directory tree listings (3 pts) — do NOT include tree-style file listings in code blocks
+- No contradictions (2 pts) — consistent tool/style recommendations
+
+Coverage (20 pts):
+- Dependency coverage (10 pts) — CRITICAL: mention the project's actual dependencies by name in CLAUDE.md or skills. Reference the key packages from package.json/requirements.txt/go.mod. The scoring checks whether each non-trivial dependency name appears somewhere in your output. Aim for >80% coverage.
+- Service/MCP coverage (6 pts) — reference detected services (DB, cloud, etc.)
+- MCP completeness (4 pts) — full points if no external services detected
+
+Accuracy (15 pts):
+- Documented commands exist (6 pts) — ONLY reference commands that actually exist in package.json scripts. Do NOT invent commands. Check the provided package.json scripts section carefully.
+- Documented paths exist (4 pts) — ONLY reference file paths from the provided file tree. Never guess paths.
+- Config freshness (5 pts) — config must match current code state
+
+Freshness & Safety (10 pts):
+- No secrets in configs (4 pts) — never include API keys, tokens, or credentials
+- Permissions configured (2 pts) — handled by caliber, not your responsibility
+
+Bonus (5 pts):
+- Hooks configured (2 pts), AGENTS.md (1 pt), OpenSkills format (2 pts) — handled by caliber
+
 OUTPUT SIZE CONSTRAINTS — these are critical:
-- CLAUDE.md: max 200 lines. Be concise — only commands, architecture, and conventions.
+- CLAUDE.md: MUST be under 100 lines for maximum score. Aim for 70-90 lines. Be extremely concise — only commands, architecture overview, and key conventions. Use bullet points and tables, not prose.
 - Skills: max 5 skills total (across claude + cursor). Only generate skills for the most important frameworks.
 - Each skill content: max 150 lines. Focus on patterns and examples, not exhaustive docs.
 - Cursor rules: max 5 .mdc files.

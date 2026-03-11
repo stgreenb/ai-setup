@@ -1,15 +1,19 @@
 import chalk from 'chalk';
 import { computeLocalScore } from '../scoring/index.js';
+import type { TargetAgent } from '../scoring/index.js';
 import { displayScore } from '../scoring/display.js';
+import { readState } from '../lib/state.js';
 
 interface ScoreOptions {
   json?: boolean;
   quiet?: boolean;
+  agent?: TargetAgent;
 }
 
 export async function scoreCommand(options: ScoreOptions) {
   const dir = process.cwd();
-  const result = computeLocalScore(dir);
+  const target = options.agent ?? readState()?.targetAgent;
+  const result = computeLocalScore(dir, target);
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -17,14 +21,12 @@ export async function scoreCommand(options: ScoreOptions) {
   }
 
   if (options.quiet) {
-    // One-liner for scripts/hooks
     console.log(`${result.score}/100 (${result.grade})`);
     return;
   }
 
   displayScore(result);
 
-  // Footer suggestion
   const separator = chalk.gray('  ' + '─'.repeat(53));
   console.log(separator);
 

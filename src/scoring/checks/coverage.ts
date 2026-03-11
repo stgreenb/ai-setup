@@ -142,6 +142,17 @@ function collectAllConfigContent(dir: string): string {
   return parts.join('\n').toLowerCase();
 }
 
+/** Check if the project has any external services detected from dependencies. */
+export function hasExternalServices(dir: string): boolean {
+  const allDeps = [
+    ...extractNpmDeps(dir),
+    ...extractPythonDeps(dir),
+    ...extractGoDeps(dir),
+    ...extractRustDeps(dir),
+  ];
+  return detectServices(dir, allDeps).length > 0;
+}
+
 /** Detect services that should have MCP servers. */
 function detectServices(dir: string, deps: string[]): string[] {
   const serviceMap: Record<string, string[]> = {
@@ -230,9 +241,10 @@ export function checkCoverage(dir: string): Check[] {
   }
 
   const depCoverageRatio = allDeps.length > 0 ? mentionedDeps.length / allDeps.length : 1;
+  const effectiveRatio = depCoverageRatio >= 0.85 ? 1 : depCoverageRatio;
   const depPoints = allDeps.length === 0
     ? POINTS_DEP_COVERAGE
-    : Math.round(depCoverageRatio * POINTS_DEP_COVERAGE);
+    : Math.round(effectiveRatio * POINTS_DEP_COVERAGE);
 
   const topUnmatched = unmatchedDeps.slice(0, 3);
 
@@ -291,12 +303,15 @@ export function checkCoverage(dir: string): Check[] {
   });
 
   // 3. MCP completeness — do configured MCPs match what the project actually uses?
-  const mcpRelevant = mcpServers.size > 0 && detectedServices.length > 0;
-  const mcpPoints = mcpRelevant
-    ? Math.round(serviceCoverageRatio * POINTS_MCP_COVERAGE)
-    : mcpServers.size > 0
-      ? POINTS_MCP_COVERAGE
-      : 0;
+  //    Full points if no services detected (MCP not needed) or if MCP servers cover services.
+  let mcpPoints: number;
+  if (detectedServices.length === 0) {
+    mcpPoints = POINTS_MCP_COVERAGE; // no services = MCP not needed
+  } else if (mcpServers.size > 0) {
+    mcpPoints = Math.round(serviceCoverageRatio * POINTS_MCP_COVERAGE);
+  } else {
+    mcpPoints = 0;
+  }
 
   checks.push({
     id: 'mcp_completeness',
@@ -305,9 +320,11 @@ export function checkCoverage(dir: string): Check[] {
     maxPoints: POINTS_MCP_COVERAGE,
     earnedPoints: mcpPoints,
     passed: mcpPoints >= POINTS_MCP_COVERAGE / 2,
-    detail: mcpServers.size === 0
-      ? 'No MCP servers configured'
-      : `${mcpServers.size} MCP server${mcpServers.size === 1 ? '' : 's'} configured`,
+    detail: detectedServices.length === 0
+      ? 'No external services detected (MCP not needed)'
+      : mcpServers.size === 0
+        ? 'No MCP servers configured'
+        : `${mcpServers.size} MCP server${mcpServers.size === 1 ? '' : 's'} configured`,
     suggestion: mcpServers.size === 0 && detectedServices.length > 0
       ? `Project uses ${detectedServices.join(', ')} but has no MCP servers`
       : undefined,

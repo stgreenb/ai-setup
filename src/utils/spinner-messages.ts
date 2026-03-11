@@ -28,6 +28,7 @@ export class SpinnerMessages {
   private messages: string[];
   private index = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private elapsedTimer: ReturnType<typeof setInterval> | null = null;
   private startTime = 0;
   private showElapsedTime: boolean;
   private currentBaseMessage = '';
@@ -56,14 +57,14 @@ export class SpinnerMessages {
     this.updateSpinnerText();
     if (this.showElapsedTime) {
       this.spinner.suffixText = chalk.dim(`(${this.formatElapsed()})`);
+      this.elapsedTimer = setInterval(() => {
+        this.spinner.suffixText = chalk.dim(`(${this.formatElapsed()})`);
+      }, 1000);
     }
     this.timer = setInterval(() => {
       this.index = (this.index + 1) % this.messages.length;
       this.currentBaseMessage = this.messages[this.index];
       this.updateSpinnerText();
-      if (this.showElapsedTime) {
-        this.spinner.suffixText = chalk.dim(`(${this.formatElapsed()})`);
-      }
     }, 3000);
   }
 
@@ -85,6 +86,10 @@ export class SpinnerMessages {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.elapsedTimer) {
+      clearInterval(this.elapsedTimer);
+      this.elapsedTimer = null;
     }
     this.spinner.suffixText = '';
   }

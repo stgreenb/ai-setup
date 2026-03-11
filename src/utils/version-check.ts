@@ -14,7 +14,7 @@ const pkg = JSON.parse(
 function getInstalledVersion(): string | null {
   try {
     const globalRoot = execSync('npm root -g', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-    const pkgPath = path.join(globalRoot, '@caliber-ai', 'caliber', 'package.json');
+    const pkgPath = path.join(globalRoot, '@rely-ai', 'caliber', 'package.json');
     return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version;
   } catch {
     return null;
@@ -28,7 +28,7 @@ export async function checkForUpdates(): Promise<void> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
 
-    const res = await fetch('https://registry.npmjs.org/@caliber-ai/caliber/latest', {
+    const res = await fetch('https://registry.npmjs.org/@rely-ai/caliber/latest', {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -47,7 +47,7 @@ export async function checkForUpdates(): Promise<void> {
     if (!isInteractive) {
       console.log(
         chalk.yellow(
-          `\nUpdate available: ${current} -> ${latest}\nRun ${chalk.bold('npm install -g @caliber-ai/caliber')} to upgrade.\n`
+          `\nUpdate available: ${current} -> ${latest}\nRun ${chalk.bold('npm install -g @rely-ai/caliber')} to upgrade.\n`
         )
       );
       return;
@@ -65,12 +65,12 @@ export async function checkForUpdates(): Promise<void> {
 
     const spinner = ora('Updating caliber...').start();
     try {
-      execSync(`npm install -g @caliber-ai/caliber@${latest} --prefer-online`, { stdio: 'pipe', timeout: 60_000 });
+      execSync(`npm install -g @rely-ai/caliber@${latest} --prefer-online`, { stdio: 'pipe', timeout: 60_000 });
 
       const installed = getInstalledVersion();
       if (installed !== latest) {
         spinner.fail(`Update incomplete — got ${installed ?? 'unknown'}, expected ${latest}`);
-        console.log(chalk.yellow(`Run ${chalk.bold(`npm install -g @caliber-ai/caliber@${latest}`)} manually.\n`));
+        console.log(chalk.yellow(`Run ${chalk.bold(`npm install -g @rely-ai/caliber@${latest}`)} manually.\n`));
         return;
       }
 
@@ -89,7 +89,7 @@ export async function checkForUpdates(): Promise<void> {
       if (msg && !msg.includes('SIGTERM')) console.log(chalk.dim(`  ${msg.split('\n')[0]}`));
       console.log(
         chalk.yellow(
-          `Run ${chalk.bold(`npm install -g @caliber-ai/caliber@${latest}`)} manually to upgrade.\n`
+          `Run ${chalk.bold(`npm install -g @rely-ai/caliber@${latest}`)} manually to upgrade.\n`
         )
       );
     }

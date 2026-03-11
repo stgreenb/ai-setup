@@ -77,6 +77,7 @@ program
   .description('Score your current agent config setup (deterministic, no network)')
   .option('--json', 'Output as JSON')
   .option('--quiet', 'One-line output for scripts/hooks')
+  .option('--agent <type>', 'Target agent: claude, cursor, or both')
   .action(scoreCommand);
 
 program

@@ -5,7 +5,7 @@ Open-source CLI that analyzes your project and generates optimized configuration
 ## Installation
 
 ```bash
-npm install -g @caliber-ai/caliber
+npm install -g @rely-ai/caliber
 ```
 
 ## Quick Start

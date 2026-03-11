@@ -1,6 +1,10 @@
-# Git Workflow for caliber-cli
+---
+name: git-workflow
+description: Git commit and PR workflow for @rely-ai/caliber. Use when staging commits, writing conventional commit messages, pushing branches, or creating GitHub PRs with gh CLI.
+---
+# Git Workflow for caliber
 
-This project uses **conventional commits** for automated semantic versioning via CI. Follow this workflow precisely.
+Uses **conventional commits** for automated semantic versioning via CI.
 
 ## Commit Message Format
 
@@ -19,41 +23,31 @@ This project uses **conventional commits** for automated semantic versioning via
 | `docs:` | patch | Documentation only |
 | `ci:` | patch | CI/CD changes |
 
-Scope is optional and should reference the affected module: `feat(scanner): detect Cursor config`
+Scope references the affected module: `feat(scanner): detect Cursor config`
 
 ## Staging and Committing
 
-Always stage specific files — never use `git add -A` or `git add .` without reviewing what changed first:
-
 ```bash
-git status                      # Review what changed
-git diff src/commands/score.ts  # Inspect a file before staging
+git status
+git diff src/commands/score.ts
 git add src/commands/score.ts src/scoring/index.ts
 git commit -m "feat(scoring): add dependency coverage check"
 ```
 
-Include a `Co-Authored-By` trailer when Claude assisted:
-
-```
-feat(scoring): add dependency coverage check
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
+Include `Co-Authored-By: Claude <noreply@anthropic.com>` when Claude assisted.
 
 ## Before Pushing
 
 ```bash
 npm run build          # Ensure TypeScript compiles
 npm run test           # Ensure all tests pass
-git log origin/main..HEAD --oneline  # Verify commits look correct
+git log origin/main..HEAD --oneline
 git push -u origin <branch-name>
 ```
 
 Never force-push to `main` without explicit user approval.
 
 ## Creating a Pull Request
-
-Use the GitHub CLI:
 
 ```bash
 gh pr create \
@@ -68,14 +62,10 @@ gh pr create \
 - [ ] Manually tested caliber <command>"
 ```
 
-PR title must follow the conventional commit format — the CI semver bump reads the **merge commit** message, which GitHub derives from the PR title by default.
+PR title must follow conventional commit format — CI reads merge commit message for semver bump.
 
 ## Checking What Will Be Published
-
-To preview what version bump the next merge to `main` would trigger:
 
 ```bash
 git log $(git describe --tags --abbrev=0)..HEAD --oneline
 ```
-
-Look for `feat:` (minor bump) vs `fix:`/`chore:` (patch bump) vs `feat!:` (major bump).

@@ -1,119 +1,108 @@
 # CLAUDE.md — Caliber
 
-## Overview
+## What Is This
 
-Caliber is an open-source CLI that analyzes coding projects and generates optimized AI agent configurations (CLAUDE.md, .cursorrules, skills). It supports multiple LLM providers — bring your own API key.
+`@rely-ai/caliber` — open-source CLI that fingerprints coding projects and generates optimized AI agent configs (CLAUDE.md, .cursor/rules/, skills). Supports Anthropic, OpenAI, Google Vertex AI, and any OpenAI-compatible endpoint.
+
+## Monorepo Layout
+
+| Dir | Purpose |
+|-----|---------|
+| `src/` | Main CLI source (published package) |
+| `apps/api/` | Internal API server |
+| `apps/web/` | Internal web frontend |
+| `packages/mcp-server/` | MCP server package |
+| `packages/shared/` | Shared utilities |
 
 ## Commands
 
 ```bash
-npm run build        # Compile via tsup (outputs to dist/)
-npm run dev          # Watch mode (tsup --watch)
-npm run test         # Run test suite via vitest
-npm run test -- --coverage  # Run tests with v8 coverage report
+npm run build                    # Compile via tsup → dist/
+npm run dev                      # Watch mode (tsup --watch)
+npm run test                     # Run Vitest suite
+npm run test -- --coverage       # v8 coverage report
+npx tsc --noEmit                 # Type-check only
+npx vitest run src/scoring/__tests__/accuracy.test.ts  # Single file
 ```
-
-> **Note:** There is no standalone typecheck script. TypeScript checking happens implicitly during `npm run build`. To check types without emitting, run: `npx tsc --noEmit`.
 
 ## Architecture
 
-### Entry Points
-- `src/bin.ts` — CLI entry point: checks for updates and runs Commander
-- `src/cli.ts` — Commander program: registers all commands and reads version from `package.json`
+**Entry**: `src/bin.ts` (version check) → `src/cli.ts` (Commander, registers all commands)
 
-### LLM Layer (`src/llm/`)
-Provider-agnostic LLM abstraction supporting Anthropic, Vertex AI, and OpenAI-compatible endpoints:
-- `types.ts` — Provider interface, config types
-- `config.ts` — Config resolution: env vars → `~/.caliber/config.json`
-- `anthropic.ts` — Anthropic direct API via `@anthropic-ai/sdk`
-- `vertex.ts` — Google Vertex AI via `@anthropic-ai/vertex-sdk`
-- `openai-compat.ts` — OpenAI and compatible endpoints (Ollama, vLLM, etc.)
-- `utils.ts` — JSON extraction (bracket-balancing parser), token estimation
-- `index.ts` — Provider factory, retry logic, `llmCall()` / `llmJsonCall()` helpers
+**LLM layer** (`src/llm/`):
+- `types.ts` — `LLMProvider` interface, `LLMConfig`, `LLMCallOptions`, `LLMStreamCallbacks`
+- `config.ts` — env vars → `~/.caliber/config.json`; `DEFAULT_MODELS`, `loadConfig()`, `resolveFromEnv()`
+- `anthropic.ts` (`@anthropic-ai/sdk`), `vertex.ts` (`@anthropic-ai/vertex-sdk`, `google-auth-library`), `openai-compat.ts` (`openai`)
+- `utils.ts` — `extractJson()` bracket-balancing parser, `stripMarkdownFences()`, `parseJsonResponse()`, `estimateTokens()`
+- `index.ts` — `llmCall()`, `llmJsonCall()`, `getProvider()`, retry + backoff, `TRANSIENT_ERRORS`
 
-### AI Logic (`src/ai/`)
-All AI operations with system prompts:
-- `prompts.ts` — System prompts for generation, refinement, refresh, learning, fingerprinting
-- `generate.ts` — Streaming setup generation with status line parsing
-- `refine.ts` — Iterative setup refinement via conversation
-- `refresh.ts` — Conservative doc updates from git diffs
-- `learn.ts` — Session tool event analysis for learned instructions
-- `detect.ts` — LLM-powered language/framework detection
+**AI logic** (`src/ai/`):
+- `generate.ts` — streaming init via `generateSetup()`
+- `refine.ts` — conversation refinement via `refineSetup()`
+- `refresh.ts` — diff-based updates via `refreshDocs()`
+- `learn.ts` — session event analysis via `analyzeEvents()`
+- `detect.ts` — LLM-based framework detection via `detectFrameworks()`
+- `prompts.ts` — all system prompts (`GENERATION_SYSTEM_PROMPT`, `REFINE_SYSTEM_PROMPT`, `REFRESH_SYSTEM_PROMPT`, `LEARN_SYSTEM_PROMPT`, `FINGERPRINT_SYSTEM_PROMPT`)
 
-### Commands (`src/commands/`)
-| File | Command | Description |
-|------|---------|-------------|
-| `init.ts` | `caliber init` | Fingerprint project, generate config via LLM, write files |
-| `regenerate.ts` | `caliber update` | Re-fingerprint and regenerate config |
-| `status.ts` | `caliber status` | Show manifest state and LLM config |
-| `undo.ts` | `caliber undo` | Restore backups and remove Caliber-managed files |
-| `config.ts` | `caliber config` | Interactive LLM provider/key/model setup |
-| `recommend.ts` | `caliber recommend` | Skill discovery from skills.sh |
-| `score.ts` | `caliber score` | Deterministic local scoring (no LLM) |
-| `refresh.ts` | `caliber refresh` | Post-commit hook: analyze diffs, update docs |
-| `hooks.ts` | `caliber hooks install/remove/status` | Manage Claude Code hook entries |
-| `learn.ts` | `caliber learn` | Session learning: observe, finalize, install, remove, status |
+**Commands** (`src/commands/`): `init`, `regenerate` (alias: `update`/`regen`), `status`, `undo`, `config`, `recommend`, `score`, `refresh`, `hooks`, `learn`
 
-### Fingerprinting (`src/fingerprint/`)
-Collects project context sent to the LLM during generation:
-- `git.ts` — Git remote URL and repo detection
-- `languages.ts` — Language detection from file extensions
-- `package-json.ts` — Framework detection (Node + Python)
-- `file-tree.ts` — Directory tree snapshot
-- `existing-config.ts` — Reads pre-existing agent config files
-- `code-analysis.ts` — File summaries, API routes, config files
-- `index.ts` — Orchestrator, LLM enrichment for richer detection
+**Fingerprinting** (`src/fingerprint/`):
+- `git.ts`, `languages.ts`, `package-json.ts` (uses `glob`/`globSync`), `file-tree.ts`, `existing-config.ts`, `code-analysis.ts`
+- `index.ts` — orchestrates all above, then calls `enrichFingerprintWithLLM()`
+- Hash stored in `Fingerprint.hash` for drift detection
 
-### Writers (`src/writers/`)
-Receive an `AgentSetup` object and write files to disk:
-- `claude/index.ts` — Writes `CLAUDE.md` and `.claude/` skills
-- `cursor/index.ts` — Writes `.cursorrules` and `.cursor/rules/*.mdc`
-- `staging.ts` — In-memory staging before committing writes
-- `manifest.ts` — Tracks written files in `.caliber/manifest.json`
-- `backup.ts` — Timestamped backups in `.caliber/backups/`
-- `refresh.ts` — Writes docs from refresh API response
+**Writers** (`src/writers/`):
+- `claude/index.ts`, `cursor/index.ts` — write config files
+- `staging.ts` — buffers writes before user confirmation
+- `manifest.ts` — tracks written files in `.caliber/manifest.json`
+- `backup.ts` — timestamped backups in `.caliber/backups/`
+- `refresh.ts` — diff-targeted doc updates
 
-### Other Modules
-- `src/scanner/` — Scans local config files, computes hashes
-- `src/learner/` — Session event storage and learned content writer
-- `src/scoring/` — Deterministic config quality scoring (no LLM)
-- `src/lib/hooks.ts` — Claude Code settings.json hook management
-- `src/lib/learning-hooks.ts` — Learning hook lifecycle
-- `src/lib/state.ts` — `.caliber/state.json` tracking
-- `src/lib/git-diff.ts` — Git diff collection for refresh
-- `src/utils/` — Editor detection, spinner messages, version checking
-- `src/constants.ts` — Paths for `.caliber/` directory structure
+**Scoring** (`src/scoring/`): Deterministic, no LLM. Checks: `existence`, `quality`, `coverage`, `accuracy`, `freshness`, `bonus`. Run via `caliber score`. Constants in `scoring/constants.ts`.
 
-## LLM Provider Configuration
+**Learner** (`src/learner/`):
+- `storage.ts` — captures Claude Code session tool events → `.caliber/learning/`
+- `writer.ts` — writes learned skills/instructions to CLAUDE.md
+- `stdin.ts` — reads hook-piped events
+- Finalized via `caliber learn finalize`
 
-Config is resolved in order:
-1. **Environment variables** (highest priority):
-   - `ANTHROPIC_API_KEY` → Anthropic provider (default model: `claude-sonnet-4-6`)
-   - `VERTEX_PROJECT_ID` or `GCP_PROJECT_ID` → Vertex AI provider (default region: `us-east5`, supports ADC or `VERTEX_SA_CREDENTIALS` JSON / `GOOGLE_APPLICATION_CREDENTIALS` file path)
-   - `OPENAI_API_KEY` → OpenAI provider (default model: `gpt-4.1`, + `OPENAI_BASE_URL` for custom endpoints)
-   - `CALIBER_MODEL` → Override default model for any provider
-2. **Config file**: `~/.caliber/config.json` (created by `caliber config`)
+**Scanner** (`src/scanner/index.ts`): `detectPlatforms()`, `scanLocalState()`, `compareState()` — detects installed claude/cursor configs.
+
+## LLM Provider Config
+
+Resolution order (highest priority first):
+1. `ANTHROPIC_API_KEY` → Anthropic (`claude-sonnet-4-6` default)
+2. `VERTEX_PROJECT_ID` / `GCP_PROJECT_ID` → Vertex AI (`us-east5`; ADC, `VERTEX_SA_CREDENTIALS`, or `GOOGLE_APPLICATION_CREDENTIALS`)
+3. `OPENAI_API_KEY` → OpenAI (`gpt-4.1`; `OPENAI_BASE_URL` for custom endpoints)
+4. `~/.caliber/config.json` — written by `caliber config`
+5. `CALIBER_MODEL` — overrides model for any provider
 
 ## Testing
 
-- Framework: **Vitest** with `globals: true` and `environment: node`
-- Setup file: `src/test/setup.ts` (mocks LLM provider)
-- Tests live in `src/**/__tests__/*.test.ts`
-- Run a single test: `npx vitest run src/scoring/__tests__/accuracy.test.ts`
+- **Framework**: Vitest (`globals: true`, `environment: node`)
+- **Setup**: `src/test/setup.ts` — globally mocks LLM provider (no real API calls)
+- **Location**: `src/**/__tests__/*.test.ts`
+- **Coverage**: v8; excludes `src/test/`, `src/bin.ts`, `src/cli.ts`, `src/commands/**`, `dist/**`
+- Focus: `src/llm/`, `src/scoring/`, `src/fingerprint/`, `src/ai/`
 
 ## TypeScript Conventions
 
-- Strict mode enabled
-- ES module imports require `.js` extension
-- Target: ES2022 / `moduleResolution: bundler`
-- Prefer `unknown` over `any`
+- Strict mode, ES2022 target, `moduleResolution: bundler`
+- **ES module imports require `.js` extension** even for `.ts` source files
+- Prefer `unknown` over `any`; explicit types on params and return values
+- Key deps: `commander`, `chalk`, `ora`, `@inquirer/confirm`, `@inquirer/select`, `glob`, `tsup`
+
+## Error Handling
+
+- `throw new Error('__exit__')` — clean CLI exit, no stack trace
+- Use `ora` spinner `.fail()` before rethrowing async errors
+- Transient LLM errors (overload, rate limit) auto-retry in `llmCall()`
 
 ## Commit Convention
 
-Uses **conventional commits** for automated semantic versioning.
+`feat:` → minor, `fix:`/`refactor:`/`chore:` → patch, `feat!:` → major
+Scope optional: `feat(scanner): detect Cursor config`
 
-| Prefix | Bump | Example |
-|--------|------|---------|
-| `feat:` | minor | `feat: add OpenAI provider support` |
-| `fix:` | patch | `fix: handle missing config gracefully` |
-| `feat!:` | major | `feat!: change config format` |
+## Permissions
+
+See `.claude/settings.json`. Never commit API keys or credentials.
