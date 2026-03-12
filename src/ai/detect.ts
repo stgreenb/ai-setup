@@ -25,9 +25,12 @@ export async function detectFrameworks(
     }
   }
 
+  const fastModel = process.env.ANTHROPIC_SMALL_FAST_MODEL;
+
   const result = await llmJsonCall<DetectResult>({
     system: FINGERPRINT_SYSTEM_PROMPT,
     prompt: parts.join('\n'),
+    ...(fastModel ? { model: fastModel } : {}),
   });
 
   return {
