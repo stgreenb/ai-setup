@@ -19,7 +19,7 @@ import { SpinnerMessages, GENERATION_MESSAGES, REFINE_MESSAGES } from '../utils/
 import { loadConfig } from '../llm/config.js';
 import { runInteractiveProviderSetup } from './interactive-provider-setup.js';
 import { computeLocalScore } from '../scoring/index.js';
-import { displayScore, displayScoreDelta } from '../scoring/display.js';
+import { displayScoreSummary, displayScoreDelta } from '../scoring/display.js';
 import type { FailingCheck, PassingCheck } from '../ai/generate.js';
 
 type TargetAgent = 'claude' | 'cursor' | 'both';
@@ -100,8 +100,7 @@ export async function initCommand(options: InitOptions) {
 
   // Baseline score before generation
   const baselineScore = computeLocalScore(process.cwd(), targetAgent);
-  console.log(title.bold('  Current project score\n'));
-  displayScore(baselineScore);
+  displayScoreSummary(baselineScore);
 
   const hasExistingConfig = !!(
     fingerprint.existingConfigs.claudeMd || fingerprint.existingConfigs.claudeSettings ||

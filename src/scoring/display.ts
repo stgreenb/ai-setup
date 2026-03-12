@@ -104,6 +104,46 @@ export function displayScore(result: ScoreResult): void {
 }
 
 /**
+ * Render a compact score summary for init flow — score box + top failing checks.
+ */
+export function displayScoreSummary(result: ScoreResult): void {
+  const gc = gradeColor(result.grade);
+
+  const agentLabel = result.targetAgent === 'both'
+    ? 'Claude Code + Cursor'
+    : result.targetAgent === 'claude'
+      ? 'Claude Code'
+      : 'Cursor';
+
+  // Compact header
+  console.log('');
+  console.log(
+    chalk.gray('  ') +
+    gc(`${result.score}/${result.maxScore}`) +
+    chalk.gray(` (Grade ${result.grade})`) +
+    chalk.gray(`  ·  ${agentLabel}`) +
+    chalk.gray(`  ·  ${progressBar(result.score, result.maxScore, 20)}`)
+  );
+
+  // Show top failing checks (max 4)
+  const failing = result.checks.filter(c => !c.passed && c.suggestion);
+  if (failing.length > 0) {
+    const shown = failing.slice(0, 4);
+    for (const check of shown) {
+      console.log(chalk.gray(`  ✗ ${check.name}`) + chalk.dim(` — ${check.suggestion!.slice(0, 60)}`));
+    }
+    if (failing.length > shown.length) {
+      console.log(chalk.dim(`  … and ${failing.length - shown.length} more — run ${chalk.reset('caliber score')} for details`));
+    }
+  }
+
+  if (failing.length > 0) {
+    console.log(chalk.dim(`\n  Run ${chalk.reset('caliber score')} for the full breakdown.`));
+  }
+  console.log('');
+}
+
+/**
  * Render a compact before/after comparison.
  */
 export function displayScoreDelta(before: ScoreResult, after: ScoreResult): void {
