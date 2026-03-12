@@ -9,7 +9,7 @@ import { regenerateCommand } from './commands/regenerate.js';
 import { recommendCommand } from './commands/recommend.js';
 import { scoreCommand } from './commands/score.js';
 import { refreshCommand } from './commands/refresh.js';
-import { hooksInstallCommand, hooksRemoveCommand, hooksInstallPrecommitCommand, hooksRemovePrecommitCommand, hooksStatusCommand } from './commands/hooks.js';
+import { hooksCommand } from './commands/hooks.js';
 import { configCommand } from './commands/config.js';
 import {
   learnObserveCommand,
@@ -87,34 +87,12 @@ program
   .option('--dry-run', 'Preview changes without writing files')
   .action(refreshCommand);
 
-const hooks = program
+program
   .command('hooks')
-  .description('Manage auto-refresh hooks (Claude Code and git pre-commit)');
-
-hooks
-  .command('install')
-  .description('Install Claude Code SessionEnd auto-refresh hook')
-  .action(hooksInstallCommand);
-
-hooks
-  .command('remove')
-  .description('Remove Claude Code SessionEnd auto-refresh hook')
-  .action(hooksRemoveCommand);
-
-hooks
-  .command('install-precommit')
-  .description('Install git pre-commit hook for auto-refresh')
-  .action(hooksInstallPrecommitCommand);
-
-hooks
-  .command('remove-precommit')
-  .description('Remove git pre-commit hook')
-  .action(hooksRemovePrecommitCommand);
-
-hooks
-  .command('status')
-  .description('Check installed hooks status')
-  .action(hooksStatusCommand);
+  .description('Manage auto-refresh hooks (toggle interactively)')
+  .option('--install', 'Enable all hooks non-interactively')
+  .option('--remove', 'Disable all hooks non-interactively')
+  .action(hooksCommand);
 
 const learn = program
   .command('learn')

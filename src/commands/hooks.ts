@@ -1,65 +1,193 @@
 import chalk from 'chalk';
-import { isHookInstalled, installHook, removeHook, isPreCommitHookInstalled, installPreCommitHook, removePreCommitHook } from '../lib/hooks.js';
+import {
+  isHookInstalled, installHook, removeHook,
+  isPreCommitHookInstalled, installPreCommitHook, removePreCommitHook,
+} from '../lib/hooks.js';
 
-export async function hooksInstallCommand() {
-  const result = installHook();
-  if (result.alreadyInstalled) {
-    console.log(chalk.dim('Claude Code hook already installed.'));
-    return;
-  }
-  console.log(chalk.green('✓') + ' SessionEnd hook installed in .claude/settings.json');
-  console.log(chalk.dim('  Docs will auto-refresh when Claude Code sessions end.'));
+interface HookDef {
+  id: string;
+  label: string;
+  description: string;
+  isInstalled: () => boolean;
+  install: () => { installed: boolean; alreadyInstalled: boolean };
+  remove: () => { removed: boolean; notFound: boolean };
 }
 
-export async function hooksRemoveCommand() {
-  const result = removeHook();
-  if (result.notFound) {
-    console.log(chalk.dim('Claude Code hook not found.'));
-    return;
+const HOOKS: HookDef[] = [
+  {
+    id: 'session-end',
+    label: 'Claude Code SessionEnd',
+    description: 'Auto-refresh CLAUDE.md when a Claude Code session ends',
+    isInstalled: isHookInstalled,
+    install: installHook,
+    remove: removeHook,
+  },
+  {
+    id: 'pre-commit',
+    label: 'Git pre-commit',
+    description: 'Auto-refresh CLAUDE.md before each git commit',
+    isInstalled: isPreCommitHookInstalled,
+    install: installPreCommitHook,
+    remove: removePreCommitHook,
+  },
+];
+
+function printStatus() {
+  console.log(chalk.bold('\n  Hooks\n'));
+  for (const hook of HOOKS) {
+    const installed = hook.isInstalled();
+    const icon = installed ? chalk.green('✓') : chalk.dim('✗');
+    const state = installed ? chalk.green('enabled') : chalk.dim('disabled');
+    console.log(`  ${icon} ${hook.label.padEnd(26)} ${state}`);
+    console.log(chalk.dim(`    ${hook.description}`));
   }
-  console.log(chalk.green('✓') + ' SessionEnd hook removed from .claude/settings.json');
+  console.log('');
 }
 
-export async function hooksInstallPrecommitCommand() {
-  const result = installPreCommitHook();
-  if (result.alreadyInstalled) {
-    console.log(chalk.dim('Pre-commit hook already installed.'));
+// --- Interactive mode (default when running `caliber hooks`) ---
+
+export async function hooksCommand(options: { install?: boolean; remove?: boolean }) {
+  if (options.install) {
+    for (const hook of HOOKS) {
+      const result = hook.install();
+      if (result.alreadyInstalled) {
+        console.log(chalk.dim(`  ${hook.label} already enabled.`));
+      } else {
+        console.log(chalk.green('  ✓') + ` ${hook.label} enabled`);
+      }
+    }
     return;
   }
-  if (!result.installed) {
-    console.log(chalk.red('Failed to install pre-commit hook (not a git repository?).'));
+
+  if (options.remove) {
+    for (const hook of HOOKS) {
+      const result = hook.remove();
+      if (result.notFound) {
+        console.log(chalk.dim(`  ${hook.label} already disabled.`));
+      } else {
+        console.log(chalk.green('  ✓') + ` ${hook.label} removed`);
+      }
+    }
     return;
   }
-  console.log(chalk.green('✓') + ' Pre-commit hook installed in .git/hooks/pre-commit');
-  console.log(chalk.dim('  Docs will auto-refresh before each commit via LLM.'));
-}
 
-export async function hooksRemovePrecommitCommand() {
-  const result = removePreCommitHook();
-  if (result.notFound) {
-    console.log(chalk.dim('Pre-commit hook not found.'));
+  // Interactive toggle UI
+  if (!process.stdin.isTTY) {
+    printStatus();
     return;
   }
-  console.log(chalk.green('✓') + ' Pre-commit hook removed from .git/hooks/pre-commit');
-}
 
-export async function hooksStatusCommand() {
-  const claudeInstalled = isHookInstalled();
-  const precommitInstalled = isPreCommitHookInstalled();
+  const { stdin, stdout } = process;
+  let cursor = 0;
+  let lineCount = 0;
 
-  if (claudeInstalled) {
-    console.log(chalk.green('✓') + ' Claude Code hook is ' + chalk.green('installed'));
-  } else {
-    console.log(chalk.dim('✗') + ' Claude Code hook is ' + chalk.yellow('not installed'));
+  // Snapshot current state into a mutable array
+  const states = HOOKS.map(h => h.isInstalled());
+
+  function render(): string {
+    const lines: string[] = [];
+    lines.push(chalk.bold('  Hooks'));
+    lines.push('');
+
+    for (let i = 0; i < HOOKS.length; i++) {
+      const hook = HOOKS[i];
+      const enabled = states[i];
+      const toggle = enabled ? chalk.green('[on] ') : chalk.dim('[off]');
+      const ptr = i === cursor ? chalk.cyan('>') : ' ';
+      lines.push(`  ${ptr} ${toggle} ${hook.label}`);
+      lines.push(chalk.dim(`        ${hook.description}`));
+    }
+
+    lines.push('');
+    lines.push(chalk.dim('  ↑↓ navigate  ⎵ toggle  a all on  n all off  ⏎ apply  q cancel'));
+    return lines.join('\n');
   }
 
-  if (precommitInstalled) {
-    console.log(chalk.green('✓') + ' Pre-commit hook is ' + chalk.green('installed'));
-  } else {
-    console.log(chalk.dim('✗') + ' Pre-commit hook is ' + chalk.yellow('not installed'));
+  function draw(initial: boolean) {
+    if (!initial && lineCount > 0) {
+      stdout.write(`\x1b[${lineCount}A`);
+    }
+    stdout.write('\x1b[0J');
+    const output = render();
+    stdout.write(output + '\n');
+    lineCount = output.split('\n').length;
   }
 
-  if (!claudeInstalled && !precommitInstalled) {
-    console.log(chalk.dim('\n  Run `caliber hooks install` or `caliber hooks install-precommit` to enable auto-refresh.'));
-  }
+  return new Promise<void>((resolve) => {
+    console.log('');
+    draw(true);
+
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    function cleanup() {
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+    }
+
+    function apply() {
+      let changed = 0;
+      for (let i = 0; i < HOOKS.length; i++) {
+        const hook = HOOKS[i];
+        const wasInstalled = hook.isInstalled();
+        const wantEnabled = states[i];
+
+        if (wantEnabled && !wasInstalled) {
+          hook.install();
+          console.log(chalk.green('  ✓') + ` ${hook.label} enabled`);
+          changed++;
+        } else if (!wantEnabled && wasInstalled) {
+          hook.remove();
+          console.log(chalk.green('  ✓') + ` ${hook.label} disabled`);
+          changed++;
+        }
+      }
+      if (changed === 0) {
+        console.log(chalk.dim('  No changes.'));
+      }
+      console.log('');
+    }
+
+    function onData(key: string) {
+      switch (key) {
+        case '\x1b[A':
+          cursor = (cursor - 1 + HOOKS.length) % HOOKS.length;
+          draw(false);
+          break;
+        case '\x1b[B':
+          cursor = (cursor + 1) % HOOKS.length;
+          draw(false);
+          break;
+        case ' ':
+          states[cursor] = !states[cursor];
+          draw(false);
+          break;
+        case 'a':
+          states.fill(true);
+          draw(false);
+          break;
+        case 'n':
+          states.fill(false);
+          draw(false);
+          break;
+        case '\r':
+        case '\n':
+          cleanup();
+          apply();
+          resolve();
+          break;
+        case 'q':
+        case '\x1b':
+        case '\x03':
+          cleanup();
+          console.log(chalk.dim('\n  Cancelled.\n'));
+          resolve();
+          break;
+      }
+    }
+
+    stdin.on('data', onData);
+  });
 }
