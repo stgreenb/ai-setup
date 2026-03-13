@@ -5,6 +5,7 @@ export function readExistingConfigs(dir: string) {
   const configs: {
     claudeMd?: string;
     readmeMd?: string;
+    agentsMd?: string;
     claudeSettings?: Record<string, unknown>;
     claudeSkills?: Array<{ filename: string; content: string }>;
     cursorrules?: string;
@@ -18,6 +19,12 @@ export function readExistingConfigs(dir: string) {
   const readmeMdPath = path.join(dir, 'README.md');
   if (fs.existsSync(readmeMdPath)) {
     configs.readmeMd = fs.readFileSync(readmeMdPath, 'utf-8');
+  }
+
+  // AGENTS.md (primary config for Codex)
+  const agentsMdPath = path.join(dir, 'AGENTS.md');
+  if (fs.existsSync(agentsMdPath)) {
+    configs.agentsMd = fs.readFileSync(agentsMdPath, 'utf-8');
   }
 
   // CLAUDE.md

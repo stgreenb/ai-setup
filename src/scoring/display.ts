@@ -65,7 +65,9 @@ export function displayScore(result: ScoreResult): void {
     ? 'Claude Code + Cursor'
     : result.targetAgent === 'claude'
       ? 'Claude Code'
-      : 'Cursor';
+      : result.targetAgent === 'codex'
+        ? 'Codex'
+        : 'Cursor';
 
   // Header box
   console.log('');
@@ -113,7 +115,9 @@ export function displayScoreSummary(result: ScoreResult): void {
     ? 'Claude Code + Cursor'
     : result.targetAgent === 'claude'
       ? 'Claude Code'
-      : 'Cursor';
+      : result.targetAgent === 'codex'
+        ? 'Codex'
+        : 'Cursor';
 
   // Compact header
   console.log('');

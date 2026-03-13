@@ -7,7 +7,7 @@ import { scanLocalState } from '../scanner/index.js';
 import { llmJsonCall } from '../llm/index.js';
 import { loadConfig } from '../llm/config.js';
 
-type Platform = 'claude' | 'cursor';
+type Platform = 'claude' | 'cursor' | 'codex';
 
 interface SkillResult {
   name: string;
@@ -38,6 +38,9 @@ function getSkillPath(platform: Platform, slug: string): string {
   if (platform === 'cursor') {
     return join('.cursor', 'skills', slug, 'SKILL.md');
   }
+  if (platform === 'codex') {
+    return join('.agents', 'skills', slug, 'SKILL.md');
+  }
   return join('.claude', 'skills', slug, 'SKILL.md');
 }
 
@@ -46,6 +49,7 @@ function getInstalledSkills(): Set<string> {
   const dirs = [
     join(process.cwd(), '.claude', 'skills'),
     join(process.cwd(), '.cursor', 'skills'),
+    join(process.cwd(), '.agents', 'skills'),
   ];
 
   for (const dir of dirs) {
@@ -548,6 +552,7 @@ async function fetchSkillContent(rec: SkillResult): Promise<string | null> {
     `https://raw.githubusercontent.com/${repoPath}/HEAD/skills/${rec.slug}/SKILL.md`,
     `https://raw.githubusercontent.com/${repoPath}/HEAD/${rec.slug}/SKILL.md`,
     `https://raw.githubusercontent.com/${repoPath}/HEAD/.claude/skills/${rec.slug}/SKILL.md`,
+    `https://raw.githubusercontent.com/${repoPath}/HEAD/.agents/skills/${rec.slug}/SKILL.md`,
   ];
 
   for (const url of candidates) {

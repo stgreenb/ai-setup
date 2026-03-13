@@ -9,7 +9,7 @@ import { fetchReadme, extractMcpConfig } from './config-extract.js';
 import type { Fingerprint } from '../fingerprint/index.js';
 import type { McpCandidate, McpServerConfig, McpDiscoveryResult } from './types.js';
 
-type TargetAgent = 'claude' | 'cursor' | 'both';
+type TargetAgent = 'claude' | 'cursor' | 'codex' | 'both';
 
 /**
  * Main orchestrator: discover and install MCP servers during init.
@@ -128,6 +128,10 @@ export async function discoverAndInstallMcps(
     const cursorDir = path.join(dir, '.cursor');
     if (!fs.existsSync(cursorDir)) fs.mkdirSync(cursorDir, { recursive: true });
     writeMcpJson(path.join(cursorDir, 'mcp.json'), mcpServers);
+  }
+  if (targetAgent === 'codex') {
+    // Codex uses .mcp.json at project root (same as Claude)
+    writeMcpJson(path.join(dir, '.mcp.json'), mcpServers);
   }
 
   return { installed: installedNames.length, names: installedNames };

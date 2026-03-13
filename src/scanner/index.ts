@@ -5,7 +5,7 @@ import os from 'os';
 
 export interface LocalItem {
   type: 'mcp' | 'rule' | 'skill' | 'config';
-  platform: 'claude' | 'cursor';
+  platform: 'claude' | 'cursor' | 'codex';
   name: string;
   contentHash: string;
   path: string;
@@ -14,6 +14,7 @@ export interface LocalItem {
 export interface PlatformDetection {
   claude: boolean;
   cursor: boolean;
+  codex: boolean;
 }
 
 export function detectPlatforms(): PlatformDetection {
@@ -21,6 +22,7 @@ export function detectPlatforms(): PlatformDetection {
   return {
     claude: fs.existsSync(path.join(home, '.claude')),
     cursor: fs.existsSync(getCursorConfigDir()),
+    codex: fs.existsSync(path.join(home, '.codex')),
   };
 }
 
@@ -67,6 +69,37 @@ export function scanLocalState(dir: string): LocalItem[] {
             name,
             contentHash: hashJson(mcpJson.mcpServers[name]),
             path: mcpJsonPath,
+          });
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Codex: AGENTS.md (when used as primary instructions)
+  const agentsMdPath = path.join(dir, 'AGENTS.md');
+  if (fs.existsSync(agentsMdPath)) {
+    items.push({
+      type: 'rule',
+      platform: 'codex',
+      name: 'AGENTS.md',
+      contentHash: hashFile(agentsMdPath),
+      path: agentsMdPath,
+    });
+  }
+
+  // Codex: .agents/skills/*/SKILL.md
+  const codexSkillsDir = path.join(dir, '.agents', 'skills');
+  if (fs.existsSync(codexSkillsDir)) {
+    try {
+      for (const name of fs.readdirSync(codexSkillsDir)) {
+        const skillFile = path.join(codexSkillsDir, name, 'SKILL.md');
+        if (fs.existsSync(skillFile)) {
+          items.push({
+            type: 'skill',
+            platform: 'codex',
+            name: `${name}/SKILL.md`,
+            contentHash: hashFile(skillFile),
+            path: skillFile,
           });
         }
       }

@@ -141,6 +141,11 @@ export const BOTH_ONLY_CHECKS = new Set([
   'no_duplicate_content',
 ]);
 
+/** Checks that only apply when targeting Codex */
+export const CODEX_ONLY_CHECKS = new Set([
+  'codex_agents_md_exists',
+]);
+
 // ── Grading ────────────────────────────────────────────────────────────
 export const GRADE_THRESHOLDS = [
   { minScore: 85, grade: 'A' },

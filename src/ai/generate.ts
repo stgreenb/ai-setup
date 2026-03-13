@@ -2,7 +2,7 @@ import type { Fingerprint } from '../fingerprint/index.js';
 import { getProvider, TRANSIENT_ERRORS } from '../llm/index.js';
 import { GENERATION_SYSTEM_PROMPT } from './prompts.js';
 
-type TargetAgent = 'claude' | 'cursor' | 'both';
+type TargetAgent = 'claude' | 'cursor' | 'codex' | 'both';
 
 interface GenerateCallbacks {
   onStatus: (message: string) => void;
@@ -180,7 +180,7 @@ export function buildGeneratePrompt(
 
   const hasExistingConfigs = !!(
     existing.claudeMd || existing.claudeSettings || existing.claudeSkills?.length ||
-    existing.readmeMd ||
+    existing.readmeMd || existing.agentsMd ||
     existing.cursorrules || existing.cursorRules?.length
   );
 
@@ -216,6 +216,7 @@ export function buildGeneratePrompt(
   }
 
   if (existing.claudeMd) parts.push(`\nExisting CLAUDE.md:\n${truncate(existing.claudeMd, LIMITS.EXISTING_CONFIG_CHARS)}`);
+  if (existing.agentsMd) parts.push(`\nExisting AGENTS.md:\n${truncate(existing.agentsMd, LIMITS.EXISTING_CONFIG_CHARS)}`);
   if (existing.readmeMd) parts.push(`\nExisting README.md:\n${truncate(existing.readmeMd, LIMITS.EXISTING_CONFIG_CHARS)}`);
 
   if (existing.claudeSkills?.length) {

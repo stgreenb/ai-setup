@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { writeClaudeConfig } from './claude/index.js';
 import { writeCursorConfig } from './cursor/index.js';
+import { writeCodexConfig } from './codex/index.js';
 import { createBackup, restoreBackup } from './backup.js';
 import {
   readManifest,
@@ -11,10 +12,11 @@ import {
 } from './manifest.js';
 
 interface AgentSetup {
-  targetAgent: 'claude' | 'cursor' | 'both';
+  targetAgent: 'claude' | 'cursor' | 'codex' | 'both';
   deletions?: Array<{ filePath: string; reason: string }>;
   claude?: Parameters<typeof writeClaudeConfig>[0];
   cursor?: Parameters<typeof writeCursorConfig>[0];
+  codex?: Parameters<typeof writeCodexConfig>[0];
 }
 
 export function writeSetup(setup: AgentSetup): { written: string[]; deleted: string[]; backupDir?: string } {
@@ -37,6 +39,10 @@ export function writeSetup(setup: AgentSetup): { written: string[]; deleted: str
 
   if ((setup.targetAgent === 'cursor' || setup.targetAgent === 'both') && setup.cursor) {
     written.push(...writeCursorConfig(setup.cursor));
+  }
+
+  if (setup.targetAgent === 'codex' && setup.codex) {
+    written.push(...writeCodexConfig(setup.codex));
   }
 
   const deleted: string[] = [];
@@ -119,6 +125,13 @@ function getFilesToWrite(setup: AgentSetup): string[] {
       for (const s of setup.cursor.skills) files.push(`.cursor/skills/${s.name}/SKILL.md`);
     }
     if (setup.cursor.mcpServers) files.push('.cursor/mcp.json');
+  }
+
+  if (setup.targetAgent === 'codex' && setup.codex) {
+    files.push('AGENTS.md');
+    if (setup.codex.skills) {
+      for (const s of setup.codex.skills) files.push(`.agents/skills/${s.name}/SKILL.md`);
+    }
   }
 
   return files;

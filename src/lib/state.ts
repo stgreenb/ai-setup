@@ -8,7 +8,7 @@ const STATE_FILE = path.join(CALIBER_DIR, '.caliber-state.json');
 interface CaliberState {
   lastRefreshSha: string;
   lastRefreshTimestamp: string;
-  targetAgent?: 'claude' | 'cursor' | 'both';
+  targetAgent?: 'claude' | 'cursor' | 'codex' | 'both';
 }
 
 export function readState(): CaliberState | null {

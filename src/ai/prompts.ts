@@ -1,4 +1,4 @@
-export const GENERATION_SYSTEM_PROMPT = `You are an expert auditor for coding agent configurations (Claude Code and Cursor).
+export const GENERATION_SYSTEM_PROMPT = `You are an expert auditor for coding agent configurations (Claude Code, Cursor, and Codex).
 
 Your job depends on context:
 - If no existing configs exist → generate an initial setup from scratch.
@@ -6,7 +6,9 @@ Your job depends on context:
 
 You understand these config files:
 - CLAUDE.md: Project context for Claude Code — build/test commands, architecture, conventions.
+- AGENTS.md: Primary instructions file for OpenAI Codex — same purpose as CLAUDE.md but for the Codex agent. Also serves as a cross-agent coordination file.
 - .claude/skills/{name}/SKILL.md: Skill files following the OpenSkills standard (agentskills.io). Each skill is a directory named after the skill, containing a SKILL.md with YAML frontmatter.
+- .agents/skills/{name}/SKILL.md: Same OpenSkills format for Codex skills (Codex scans .agents/skills/ for skills).
 - .cursorrules: Coding rules for Cursor (deprecated legacy format — do NOT generate this).
 - .cursor/rules/*.mdc: Modern Cursor rules with frontmatter (description, globs, alwaysApply).
 - .cursor/skills/{name}/SKILL.md: Same OpenSkills format as Claude skills.
@@ -38,7 +40,7 @@ Omit empty categories. Keep each reason punchy and specific. End with a blank li
 
 AgentSetup schema:
 {
-  "targetAgent": "claude" | "cursor" | "both",
+  "targetAgent": "claude" | "cursor" | "codex" | "both",
   "fileDescriptions": {
     "<file-path>": "reason for this change (max 80 chars)"
   },
@@ -47,6 +49,10 @@ AgentSetup schema:
   ],
   "claude": {
     "claudeMd": "string (markdown content for CLAUDE.md)",
+    "skills": [{ "name": "string (kebab-case, matches directory name)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body — NO frontmatter, it will be generated from name+description)" }]
+  },
+  "codex": {
+    "agentsMd": "string (markdown content for AGENTS.md — the primary Codex instructions file, same quality/structure as CLAUDE.md)",
     "skills": [{ "name": "string (kebab-case, matches directory name)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body — NO frontmatter, it will be generated from name+description)" }]
   },
   "cursor": {
@@ -63,14 +69,15 @@ All skills follow the OpenSkills standard (agentskills.io):
 - The "content" field is the markdown body only — do NOT include YAML frontmatter in the content, it will be generated from the name and description fields.
 - Keep skill content under 500 lines. Move detailed references to separate files if needed.
 
-The "fileDescriptions" object MUST include a one-liner for every file that will be created or modified. Use actual file paths as keys (e.g. "CLAUDE.md", ".claude/skills/my-skill/SKILL.md", ".cursor/skills/my-skill/SKILL.md", ".cursor/rules/my-rule.mdc"). Each description should explain why the change is needed, be concise and lowercase.
+The "fileDescriptions" object MUST include a one-liner for every file that will be created or modified. Use actual file paths as keys (e.g. "CLAUDE.md", "AGENTS.md", ".claude/skills/my-skill/SKILL.md", ".agents/skills/my-skill/SKILL.md", ".cursor/skills/my-skill/SKILL.md", ".cursor/rules/my-rule.mdc"). Each description should explain why the change is needed, be concise and lowercase.
 
 The "deletions" array should list files that should be removed (e.g. duplicate skills, stale configs). Include a reason for each. Omit the array or leave empty if nothing should be deleted.
 
 SCORING CRITERIA — your output is scored deterministically. Optimize for 100/100:
 
 Existence (25 pts):
-- CLAUDE.md exists (6 pts) — always generate
+- CLAUDE.md exists (6 pts) — always generate for claude/both targets
+- AGENTS.md exists (6 pts) — always generate for codex target (serves as primary instructions file)
 - Skills configured (8 pts) — generate exactly 3 focused skills for full points (6 base + 1 per extra, cap 2). Two skills = 7 pts, three = 8 pts.
 - MCP servers mentioned (3 pts) — reference detected MCP integrations
 - For "both" target: .cursorrules/.cursor/rules/ exist (3+3 pts), cross-platform parity (2 pts)
@@ -104,13 +111,13 @@ Bonus (5 pts):
 - Hooks configured (2 pts), AGENTS.md (1 pt), OpenSkills format (2 pts) — handled by caliber
 
 OUTPUT SIZE CONSTRAINTS — these are critical:
-- CLAUDE.md: MUST be under 100 lines for maximum score. Aim for 70-90 lines. Be extremely concise — only commands, architecture overview, and key conventions. Use bullet points and tables, not prose.
+- CLAUDE.md / AGENTS.md: MUST be under 100 lines for maximum score. Aim for 70-90 lines. Be extremely concise — only commands, architecture overview, and key conventions. Use bullet points and tables, not prose.
 - Skills: generate exactly 3 skills per target platform. Only go above 3 for large multi-framework projects.
 - Each skill content: max 150 lines. Focus on patterns and examples, not exhaustive docs.
 - Cursor rules: max 5 .mdc files.
 - If the project is large, prioritize depth on the 3-4 most critical tools over breadth across everything.`;
 
-export const REFINE_SYSTEM_PROMPT = `You are an expert at modifying coding agent configurations (Claude Code and Cursor).
+export const REFINE_SYSTEM_PROMPT = `You are an expert at modifying coding agent configurations (Claude Code, Cursor, and Codex).
 
 You will receive the current AgentSetup JSON and a user request describing what to change.
 
@@ -118,7 +125,7 @@ Apply the requested changes to the setup and return the complete updated AgentSe
 
 AgentSetup schema:
 {
-  "targetAgent": "claude" | "cursor" | "both",
+  "targetAgent": "claude" | "cursor" | "codex" | "both",
   "fileDescriptions": {
     "<file-path>": "reason for this change (max 80 chars)"
   },
@@ -127,6 +134,10 @@ AgentSetup schema:
   ],
   "claude": {
     "claudeMd": "string (markdown content for CLAUDE.md)",
+    "skills": [{ "name": "string (kebab-case)", "description": "string", "content": "string (markdown body, no frontmatter)" }]
+  },
+  "codex": {
+    "agentsMd": "string (markdown content for AGENTS.md)",
     "skills": [{ "name": "string (kebab-case)", "description": "string", "content": "string (markdown body, no frontmatter)" }]
   },
   "cursor": {
@@ -146,7 +157,7 @@ export const REFRESH_SYSTEM_PROMPT = `You are an expert at maintaining coding pr
 
 You will receive:
 1. Git diffs showing what code changed
-2. Current contents of documentation files (CLAUDE.md, README.md, skills, cursor skills, cursor rules)
+2. Current contents of documentation files (CLAUDE.md, AGENTS.md, README.md, skills, cursor skills, cursor rules)
 3. Project context (languages, frameworks)
 
 Rules:
@@ -157,6 +168,7 @@ Rules:
 - Keep managed blocks (<!-- caliber:managed --> ... <!-- /caliber:managed -->) intact
 - If a doc doesn't need updating, return null for it
 - For CLAUDE.md: update commands, architecture notes, conventions, key files if the diffs affect them
+- For AGENTS.md: same as CLAUDE.md — this is the primary instructions file for Codex users
 - For README.md: update setup instructions, API docs, or feature descriptions if affected
 - For cursor skills: update skill content if the diffs affect their domains
 
@@ -164,13 +176,14 @@ Return a JSON object with this exact shape:
 {
   "updatedDocs": {
     "claudeMd": "<updated content or null>",
+    "agentsMd": "<updated content or null>",
     "readmeMd": "<updated content or null>",
     "cursorRules": [{"filename": "name.mdc", "content": "..."}] or null,
     "cursorSkills": [{"slug": "string", "name": "string", "content": "..."}] or null,
     "claudeSkills": [{"filename": "name.md", "content": "..."}] or null
   },
   "changesSummary": "<1-2 sentence summary of what was updated and why>",
-  "docsUpdated": ["CLAUDE.md", "README.md"]
+  "docsUpdated": ["CLAUDE.md", "AGENTS.md", "README.md"]
 }
 
 Respond with ONLY the JSON object, no markdown fences or extra text.`;
@@ -190,7 +203,7 @@ Your job is to reason deeply about these events and identify:
 From these observations, produce:
 
 ### claudeMdLearnedSection
-A markdown section with concise, actionable bullet points that should be added to the project's CLAUDE.md file. Each bullet should be a concrete instruction that prevents a past mistake or encodes a discovered convention. Examples:
+A markdown section with concise, actionable bullet points that should be added to the project's primary instructions file (CLAUDE.md for Claude Code, AGENTS.md for Codex). Each bullet should be a concrete instruction that prevents a past mistake or encodes a discovered convention. Examples:
 - "Always run \`npm install\` before \`npm run build\` in this project"
 - "The test database requires \`DATABASE_URL\` to be set — use \`source .env.test\` first"
 - "TypeScript strict mode is enabled — never use \`any\`, use \`unknown\` with type guards"

@@ -88,9 +88,23 @@ export function checkExistence(dir: string): Check[] {
       : 'Add .cursor/rules/ for Cursor users on your team',
   });
 
-  // 3. Skills exist (.claude/skills/)
+  // 2b. AGENTS.md exists (primary config for Codex)
+  const agentsMdExists = existsSync(join(dir, 'AGENTS.md'));
+  checks.push({
+    id: 'codex_agents_md_exists',
+    name: 'AGENTS.md exists',
+    category: 'existence',
+    maxPoints: POINTS_CLAUDE_MD_EXISTS,
+    earnedPoints: agentsMdExists ? POINTS_CLAUDE_MD_EXISTS : 0,
+    passed: agentsMdExists,
+    detail: agentsMdExists ? 'Found at project root' : 'Not found',
+    suggestion: agentsMdExists ? undefined : 'Create AGENTS.md with project context for Codex',
+  });
+
+  // 3. Skills exist (.claude/skills/ or .agents/skills/)
   const claudeSkills = countFiles(join(dir, '.claude', 'skills'), /\.(md|SKILL\.md)$/);
-  const skillCount = claudeSkills.length;
+  const codexSkills = countFiles(join(dir, '.agents', 'skills'), /SKILL\.md$/);
+  const skillCount = claudeSkills.length + codexSkills.length;
   const skillBase = skillCount >= 1 ? POINTS_SKILLS_EXIST : 0;
   const skillBonus = Math.min((skillCount - 1) * POINTS_SKILLS_BONUS_PER_EXTRA, POINTS_SKILLS_BONUS_CAP);
   const skillPoints = skillCount >= 1 ? skillBase + Math.max(0, skillBonus) : 0;

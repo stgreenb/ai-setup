@@ -40,6 +40,17 @@ describe('detectTargetAgent', () => {
   it('defaults to claude when no config files found', () => {
     expect(detectTargetAgent(dir)).toBe('claude');
   });
+
+  it('returns codex when only .codex exists', () => {
+    mkdirSync(join(dir, '.codex'), { recursive: true });
+    expect(detectTargetAgent(dir)).toBe('codex');
+  });
+
+  it('returns claude over codex when CLAUDE.md exists', () => {
+    writeFileSync(join(dir, 'CLAUDE.md'), '# Config');
+    mkdirSync(join(dir, '.codex'), { recursive: true });
+    expect(detectTargetAgent(dir)).toBe('claude');
+  });
 });
 
 describe('computeLocalScore target filtering', () => {
@@ -123,6 +134,35 @@ describe('computeLocalScore target filtering', () => {
     const before = computeLocalScore(dir, 'cursor');
     writeFileSync(join(dir, '.cursorrules'), 'Use TypeScript strict mode.\nRun npm test before committing.\n');
     const after = computeLocalScore(dir, 'cursor');
+
+    expect(after.score).toBeGreaterThan(before.score);
+  });
+
+  it('excludes claude and cursor checks when target is codex', () => {
+    const result = computeLocalScore(dir, 'codex');
+    const checkIds = result.checks.map((c) => c.id);
+
+    expect(checkIds).not.toContain('claude_md_exists');
+    expect(checkIds).not.toContain('claude_md_freshness');
+    expect(checkIds).not.toContain('cursor_rules_exist');
+    expect(checkIds).not.toContain('cursor_mdc_rules');
+    expect(checkIds).not.toContain('cross_platform_parity');
+    expect(checkIds).not.toContain('no_duplicate_content');
+    expect(checkIds).toContain('codex_agents_md_exists');
+  });
+
+  it('excludes codex checks when target is claude', () => {
+    const result = computeLocalScore(dir, 'claude');
+    const checkIds = result.checks.map((c) => c.id);
+
+    expect(checkIds).not.toContain('codex_agents_md_exists');
+    expect(checkIds).toContain('claude_md_exists');
+  });
+
+  it('scores higher when AGENTS.md exists for codex target', () => {
+    const before = computeLocalScore(dir, 'codex');
+    writeFileSync(join(dir, 'AGENTS.md'), '# Project\n\n## Commands\n\n```bash\nnpm run build\nnpm test\n```\n');
+    const after = computeLocalScore(dir, 'codex');
 
     expect(after.score).toBeGreaterThan(before.score);
   });

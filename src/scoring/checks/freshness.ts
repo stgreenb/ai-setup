@@ -31,14 +31,17 @@ function daysSinceModified(filePath: string): number | null {
 export function checkFreshness(dir: string): Check[] {
   const checks: Check[] = [];
 
-  // 1. CLAUDE.md freshness (file modification time)
+  // 1. Instructions file freshness (CLAUDE.md or AGENTS.md)
   const claudeMdPath = join(dir, 'CLAUDE.md');
-  const daysOld = daysSinceModified(claudeMdPath);
+  const agentsMdPath = join(dir, 'AGENTS.md');
+  const primaryPath = existsSync(claudeMdPath) ? claudeMdPath : agentsMdPath;
+  const primaryName = existsSync(claudeMdPath) ? 'CLAUDE.md' : 'AGENTS.md';
+  const daysOld = daysSinceModified(primaryPath);
   let freshnessPoints = 0;
   let freshnessDetail = '';
 
   if (daysOld === null) {
-    freshnessDetail = 'No CLAUDE.md to check';
+    freshnessDetail = 'No instructions file to check';
   } else {
     const threshold = FRESHNESS_THRESHOLDS.find((t) => daysOld <= t.maxDaysOld);
     freshnessPoints = threshold ? threshold.points : 0;
@@ -52,7 +55,7 @@ export function checkFreshness(dir: string): Check[] {
 
   checks.push({
     id: 'claude_md_freshness',
-    name: 'CLAUDE.md freshness',
+    name: `${primaryName} freshness`,
     category: 'freshness',
     maxPoints: POINTS_FRESHNESS,
     earnedPoints: freshnessPoints,
@@ -60,13 +63,14 @@ export function checkFreshness(dir: string): Check[] {
     detail: freshnessDetail,
     suggestion:
       daysOld !== null && freshnessPoints < 4
-        ? `CLAUDE.md is ${daysOld} days old — run \`caliber refresh\` to update it`
+        ? `${primaryName} is ${daysOld} days old — run \`caliber refresh\` to update it`
         : undefined,
   });
 
   // 2. No secrets in config files
   const filesToScan = [
     'CLAUDE.md',
+    'AGENTS.md',
     '.cursorrules',
     '.claude/settings.json',
     '.claude/settings.local.json',

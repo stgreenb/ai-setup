@@ -31,18 +31,22 @@ export function checkQuality(dir: string): Check[] {
 
   const claudeMd = readFileOrNull(join(dir, 'CLAUDE.md'));
   const cursorrules = readFileOrNull(join(dir, '.cursorrules'));
+  const agentsMd = readFileOrNull(join(dir, 'AGENTS.md'));
 
   // All context files for aggregate checks
-  const allContent = [claudeMd, cursorrules].filter(Boolean) as string[];
+  const allContent = [claudeMd, cursorrules, agentsMd].filter(Boolean) as string[];
   const combinedContent = allContent.join('\n');
 
+  // Primary instructions file (CLAUDE.md, fallback to AGENTS.md for Codex users)
+  const primaryInstructions = claudeMd ?? agentsMd;
+
   // 1. Has build/test/lint commands
-  const hasCommands = claudeMd
-    ? COMMAND_PATTERNS.some((p) => p.test(claudeMd))
+  const hasCommands = primaryInstructions
+    ? COMMAND_PATTERNS.some((p) => p.test(primaryInstructions))
     : false;
-  const matchedCommands = claudeMd
-    ? COMMAND_PATTERNS.filter((p) => p.test(claudeMd)).map((p) => {
-        const m = claudeMd.match(p);
+  const matchedCommands = primaryInstructions
+    ? COMMAND_PATTERNS.filter((p) => p.test(primaryInstructions)).map((p) => {
+        const m = primaryInstructions.match(p);
         return m ? m[0] : '';
       }).filter(Boolean)
     : [];
@@ -55,17 +59,17 @@ export function checkQuality(dir: string): Check[] {
     passed: hasCommands,
     detail: hasCommands
       ? `Found: ${matchedCommands.slice(0, 3).join(', ')}`
-      : claudeMd
+      : primaryInstructions
         ? 'No build/test/lint commands detected'
-        : 'No CLAUDE.md to check',
+        : 'No instructions file to check',
     suggestion: hasCommands
       ? undefined
-      : 'Add build, test, and lint commands to CLAUDE.md',
+      : 'Add build, test, and lint commands to your instructions file',
   });
 
   // 2. Not bloated (token budget)
-  const primaryFile = claudeMd ?? cursorrules;
-  const primaryName = claudeMd ? 'CLAUDE.md' : cursorrules ? '.cursorrules' : null;
+  const primaryFile = claudeMd ?? agentsMd ?? cursorrules;
+  const primaryName = claudeMd ? 'CLAUDE.md' : agentsMd ? 'AGENTS.md' : cursorrules ? '.cursorrules' : null;
   let bloatPoints = 0;
   let lineCount = 0;
 

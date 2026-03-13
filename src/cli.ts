@@ -37,7 +37,7 @@ program
   .command('onboard')
   .alias('init')
   .description('Onboard your project for AI-assisted development')
-  .option('--agent <type>', 'Target agent: claude, cursor, or both')
+  .option('--agent <type>', 'Target agent: claude, cursor, codex, or both')
   .option('--dry-run', 'Preview changes without writing files')
   .option('--force', 'Overwrite existing setup without prompting')
   .action(initCommand);
@@ -78,7 +78,7 @@ program
   .description('Score your current agent config setup (deterministic, no network)')
   .option('--json', 'Output as JSON')
   .option('--quiet', 'One-line output for scripts/hooks')
-  .option('--agent <type>', 'Target agent: claude, cursor, or both')
+  .option('--agent <type>', 'Target agent: claude, cursor, codex, or both')
   .action(scoreCommand);
 
 program
