@@ -136,6 +136,9 @@ function validateDocumentedPaths(dir: string): {
     if (seen.has(filePath)) continue;
     seen.add(filePath);
 
+    // Skip obvious example/placeholder paths
+    if (/\/path\/to\/|\/example[s]?\/|\/your[_-]|\/foo\/|\/bar\//.test(filePath)) continue;
+
     if (existsSync(join(dir, filePath))) {
       valid.push(filePath);
     } else {

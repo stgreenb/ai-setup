@@ -461,6 +461,19 @@ export async function initCommand(options: InitOptions) {
 
   const writeSpinner = ora('Writing config files...').start();
   try {
+    // Ensure AGENTS.md is written (cross-agent coordination file, always created)
+    if (!fs.existsSync('AGENTS.md') && !generatedSetup.codex) {
+      const setupFiles = collectSetupFiles(generatedSetup);
+      const agentsStub = setupFiles.find(f => f.path === 'AGENTS.md');
+      if (agentsStub) {
+        const setup = generatedSetup as Record<string, unknown>;
+        setup.codex = { agentsMd: agentsStub.content };
+        if (!setup.targetAgent || !(setup.targetAgent as string[]).includes('codex')) {
+          (setup.targetAgent as string[]).push('codex');
+        }
+      }
+    }
+
     const result = writeSetup(generatedSetup as unknown as Parameters<typeof writeSetup>[0]);
     writeSpinner.succeed('Config files written');
     trackInitFilesWritten(

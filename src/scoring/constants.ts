@@ -67,7 +67,7 @@ export const POINTS_OPEN_SKILLS_FORMAT = 2;
 
 /** Line count thresholds for bloat scoring (per context file). */
 export const BLOAT_THRESHOLDS = [
-  { maxLines: 120, points: 6 },
+  { maxLines: 150, points: 6 },
   { maxLines: 200, points: 4 },
   { maxLines: 300, points: 3 },
   { maxLines: 500, points: 1 },

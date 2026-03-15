@@ -55,10 +55,6 @@ export function collectSetupFiles(setup: Record<string, unknown>): Array<{ path:
 
     const stubContent = `# AGENTS.md\n\nThis project uses AI coding agents configured by [Caliber](https://github.com/rely-ai-org/caliber).\n\n${agentRefs.join(' ')}\n`;
     files.push({ path: 'AGENTS.md', content: stubContent });
-
-    // Inject into setup so writeSetup() writes it too
-    if (!setup.codex) setup.codex = {};
-    (setup.codex as Record<string, unknown>).agentsMd = stubContent;
   }
 
   return files;

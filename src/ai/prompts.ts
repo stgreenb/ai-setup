@@ -96,7 +96,7 @@ Existence (25 pts):
 
 Quality (25 pts):
 - Build/test/lint commands documented (8 pts) — include actual commands from the project
-- Concise context files (6 pts) — keep CLAUDE.md under 100 lines for full points (200=4pts, 300=3pts, 500+=0pts)
+- Concise context files (6 pts) — keep CLAUDE.md under 150 lines for full points (200=4pts, 300=3pts, 500+=0pts)
 - No vague instructions (4 pts) — avoid "follow best practices", "write clean code", "ensure quality"
 - No directory tree listings (3 pts) — do NOT include tree-style file listings in code blocks
 - No contradictions (2 pts) — consistent tool/style recommendations
@@ -123,7 +123,7 @@ Bonus (5 pts):
 - Hooks configured (2 pts), AGENTS.md (1 pt), OpenSkills format (2 pts) — handled by caliber
 
 OUTPUT SIZE CONSTRAINTS — these are critical:
-- CLAUDE.md / AGENTS.md: MUST be under 100 lines for maximum score. Aim for 70-90 lines. Be extremely concise — only commands, architecture overview, and key conventions. Use bullet points and tables, not prose.
+- CLAUDE.md / AGENTS.md: MUST be under 150 lines for maximum score. Aim for 100-140 lines. Be concise — commands, architecture overview, and key conventions. Use bullet points and tables, not prose.
 - Skills: generate 3-6 skills per target platform based on project complexity. Each skill should cover a distinct tool, workflow, or domain — don't pad with generic skills.
 - Each skill content: max 150 lines. Focus on patterns and examples, not exhaustive docs.
 - Cursor rules: max 5 .mdc files.
@@ -222,7 +222,7 @@ Freshness & Safety (10 pts):
 Bonus (5 pts): Hooks (2 pts), AGENTS.md (1 pt), OpenSkills format (2 pts) — handled by caliber
 
 OUTPUT SIZE CONSTRAINTS:
-- CLAUDE.md / AGENTS.md: MUST be under 100 lines. Aim for 70-90 lines.
+- CLAUDE.md / AGENTS.md: MUST be under 150 lines. Aim for 100-140 lines.
 - Cursor rules: max 5 .mdc files.
 - Skill topics: 3-6 per platform based on project complexity (name + description only, no content).`;
 

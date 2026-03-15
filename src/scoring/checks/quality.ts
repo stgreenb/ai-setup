@@ -94,7 +94,7 @@ export function checkQuality(dir: string): Check[] {
       : 'No context files to measure',
     suggestion:
       bloatPoints < POINTS_NOT_BLOATED && primaryName
-        ? `${primaryName} is ${lineCount} lines — must be ≤120 lines for full points (currently losing ${POINTS_NOT_BLOATED - bloatPoints} pts)`
+        ? `${primaryName} is ${lineCount} lines — must be ≤150 lines for full points (currently losing ${POINTS_NOT_BLOATED - bloatPoints} pts)`
         : undefined,
   });
 
