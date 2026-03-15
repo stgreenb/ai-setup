@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/social-preview.png" alt="Caliber" width="640">
+  <img src="assets/social-preview.png" alt="Caliber — AI setup tailored for your codebase" width="640">
 </p>
 
 <p align="center">
@@ -8,10 +8,10 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/@rely-ai/caliber" alt="node"></a>
 </p>
 
-<p align="center"><strong>Improve your agentic development experience with one command</strong></p>
-
 <p align="center">
-  <img src="assets/demo.gif" alt="Caliber demo" width="640">
+  <video src="https://github.com/rely-ai-org/caliber/raw/master/assets/demo.mp4" width="640" controls muted playsinline>
+    Your browser does not support video. <a href="assets/demo.mp4">Watch the demo</a>.
+  </video>
 </p>
 
 ---

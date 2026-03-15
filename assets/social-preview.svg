@@ -1,11 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
-  <rect width="1280" height="640" fill="#0a0a0a"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
 
-  <!-- Gradient bars (logo icon) -->
-  <rect x="340" y="268" width="80" height="20" rx="5" fill="#fdba74"/>
-  <rect x="320" y="300" width="140" height="20" rx="5" fill="#fb923c"/>
-  <rect x="300" y="332" width="200" height="20" rx="5" fill="#f97316"/>
+  <!-- Logo bars (centered) -->
+  <rect x="580" y="120" width="40" height="8" rx="4" fill="#fdba74"/>
+  <rect x="565" y="134" width="70" height="8" rx="4" fill="#fb923c"/>
+  <rect x="550" y="148" width="100" height="8" rx="4" fill="#f97316"/>
 
-  <!-- CALIBER text -->
-  <text x="540" y="314" font-family="'Geist Mono', 'SF Mono', 'Fira Code', monospace" font-weight="700" font-size="90" letter-spacing="0.15em" fill="#f97316" dominant-baseline="central">CALIBER</text>
+  <!-- CALIBER brand -->
+  <text x="600" y="200" font-family="'SF Mono', 'Fira Code', 'Cascadia Code', monospace" font-weight="700" font-size="28" letter-spacing="0.15em" fill="#f97316" text-anchor="middle">CALIBER</text>
+
+  <!-- Headline -->
+  <text x="600" y="280" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="700" font-size="52" fill="#fafafa" text-anchor="middle" letter-spacing="-0.02em">AI setup tailored for your codebase.</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="330" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="400" font-size="22" fill="#a3a3a3" text-anchor="middle">Skills, configs, and MCPs — tailored to your stack.</text>
+
+  <!-- Install command box -->
+  <rect x="380" y="380" width="440" height="50" rx="4" fill="#171717" stroke="#404040" stroke-width="1"/>
+  <text x="406" y="412" font-family="'SF Mono', 'Fira Code', monospace" font-size="20" fill="#a3a3a3">$</text>
+  <text x="430" y="412" font-family="'SF Mono', 'Fira Code', monospace" font-size="20" fill="#fafafa">npm install -g @rely-ai/caliber</text>
+
+  <!-- Footer badges -->
+  <text x="490" y="490" font-family="-apple-system, sans-serif" font-size="16" fill="#a3a3a3">Open Source</text>
+  <text x="576" y="490" font-family="-apple-system, sans-serif" font-size="16" fill="#404040">|</text>
+  <text x="596" y="490" font-family="-apple-system, sans-serif" font-size="16" fill="#a3a3a3">MIT License</text>
+  <text x="684" y="490" font-family="-apple-system, sans-serif" font-size="16" fill="#404040">|</text>
+  <text x="704" y="490" font-family="-apple-system, sans-serif" font-size="16" fill="#a3a3a3">github.com/rely-ai-org/caliber</text>
 </svg>
