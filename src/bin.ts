@@ -10,7 +10,9 @@ if (process.env.CALIBER_LOCAL) {
   process.env.CALIBER_SKIP_UPDATE_CHECK = '1';
 }
 
-const isQuickExit = ['--version', '-V', '--help', '-h'].some(f => process.argv.includes(f));
+const userArgs = process.argv.slice(2);
+const hasCommand = userArgs.some(a => !a.startsWith('-'));
+const isQuickExit = !hasCommand || ['--version', '-V', '--help', '-h'].some(f => userArgs.includes(f));
 if (!isQuickExit) {
   await checkForUpdates();
 }
