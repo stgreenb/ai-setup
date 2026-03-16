@@ -169,8 +169,9 @@ learn
 
 learn
   .command('finalize')
-  .description('Analyze session events and update CLAUDE.md (called on SessionEnd)')
-  .action(tracked('learn:finalize', learnFinalizeCommand));
+  .description('Analyze session events and update CALIBER_LEARNINGS.md (called on SessionEnd)')
+  .option('--force', 'Skip the running-process check (for manual invocation)')
+  .action(tracked('learn:finalize', (opts: { force?: boolean }) => learnFinalizeCommand(opts)));
 
 learn
   .command('install')

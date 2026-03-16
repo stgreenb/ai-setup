@@ -59,9 +59,11 @@ export async function learnObserveCommand(options: { failure?: boolean }) {
   }
 }
 
-export async function learnFinalizeCommand() {
-  const { isCaliberRunning } = await import('../lib/lock.js');
-  if (isCaliberRunning()) return;
+export async function learnFinalizeCommand(options?: { force?: boolean }) {
+  if (!options?.force) {
+    const { isCaliberRunning } = await import('../lib/lock.js');
+    if (isCaliberRunning()) return;
+  }
 
   // Prevent concurrent finalize from parallel sessions
   if (!acquireFinalizeLock()) return;
