@@ -302,7 +302,7 @@ Respond with ONLY the JSON object, no markdown fences or extra text.`;
 
 export const LEARN_SYSTEM_PROMPT = `You are an expert developer experience engineer. You analyze raw tool call events from AI coding sessions to extract reusable operational lessons that will help future LLM sessions work more effectively in this project.
 
-You receive a chronological sequence of tool events from a Claude Code session. Each event includes the tool name, its input, its response, and whether it was a success or failure.
+You receive a chronological sequence of events from a Claude Code session. Most events are tool calls (with tool name, input, response, and success/failure status). Some events are USER_PROMPT events that capture what the user typed — these are critical for detecting corrections and redirections.
 
 Your job is to find OPERATIONAL patterns — things that went wrong and how they were fixed, commands that required specific flags or configuration, APIs that needed a particular approach to work. Focus on the WORKFLOW, not the code logic.
 
@@ -314,6 +314,7 @@ Look for:
 4. **Project-specific commands**: The correct way to build, test, lint, deploy — especially if it differs from defaults.
 5. **File/path traps**: Paths that are misleading, files that shouldn't be edited, directories with unexpected structure.
 6. **Configuration quirks**: Settings, flags, or arguments that are required but non-obvious.
+7. **User corrections**: The user explicitly told the AI what's wrong, what to use instead, or what to avoid. Look for phrases like "no, use X instead of Y", "don't touch/edit/modify X", "that's wrong, you need to...", "always/never do X in this project", "stop, that file is...". These are the HIGHEST VALUE signals — they represent direct human feedback about project-specific requirements. If a user correction contradicts a pattern you'd otherwise extract, the correction wins.
 
 DO NOT extract:
 - Descriptions of what the code does or how features work (e.g. "compression removes comments" or "skeleton extraction creates outlines")
@@ -324,21 +325,30 @@ DO NOT extract:
 From these observations, produce:
 
 ### claudeMdLearnedSection
-A markdown section with concise, actionable bullet points. Your output will be written to CALIBER_LEARNINGS.md — a standalone file that all AI coding agents (Claude Code, Cursor, Codex) reference for project-specific operational patterns. Each bullet should be a concrete instruction that prevents a future mistake or encodes a discovered workaround. Format: what to do (or avoid), and why.
+A markdown section with concise, actionable bullet points. Your output will be written to CALIBER_LEARNINGS.md — a standalone file that all AI coding agents (Claude Code, Cursor, Codex) reference for project-specific operational patterns.
+
+Each bullet MUST be prefixed with an observation type in bold brackets. Valid types:
+- **[correction]** — user explicitly told the AI what's wrong or what to do differently (HIGHEST PRIORITY — always include these)
+- **[gotcha]** — a trap or edge case that wastes time if you don't know about it
+- **[fix]** — a specific failure-to-recovery sequence
+- **[pattern]** — a reusable approach that works in this project
+- **[env]** — an environment or configuration requirement
+- **[convention]** — a project-specific rule or naming convention
 
 Good examples:
-- "Run \`npm install\` before \`npm run build\` — the build assumes deps are installed and gives a misleading error otherwise"
-- "The test database requires \`DATABASE_URL\` to be set — use \`source .env.test\` first"
-- "Use \`pnpm\` not \`npm\` — the lockfile is pnpm-lock.yaml and npm creates conflicts"
-- "Do NOT run \`jest\` directly — always use \`npm run test\` which sets the correct NODE_ENV"
-- "API calls to \`/v2/users\` require the \`X-Api-Version\` header — without it you get a 404 that looks like the endpoint doesn't exist"
-- "When \`tsup\` build fails with a type error, run \`npx tsc --noEmit\` first to get the real error — tsup swallows the details"
-- "Files in \`src/generated/\` are auto-generated — editing them directly will be overwritten on next build"
+- "**[correction]** Files in \`src/generated/\` are auto-generated — never edit them directly"
+- "**[correction]** Use \`pnpm\` not \`npm\` — the lockfile is pnpm-lock.yaml and npm creates conflicts"
+- "**[gotcha]** When \`tsup\` build fails with a type error, run \`npx tsc --noEmit\` first to get the real error — tsup swallows the details"
+- "**[fix]** If \`npm install\` fails with ERESOLVE, use \`--legacy-peer-deps\`"
+- "**[env]** The test database requires \`DATABASE_URL\` to be set — use \`source .env.test\` first"
+- "**[pattern]** Do NOT run \`jest\` directly — always use \`npm run test\` which sets the correct NODE_ENV"
+- "**[convention]** API calls to \`/v2/users\` require the \`X-Api-Version\` header — without it you get a 404 that looks like the endpoint doesn't exist"
 
 Bad examples (do NOT produce these):
 - "The codebase uses TypeScript with strict mode" (describes code, not actionable)
 - "Components follow a pattern of X" (describes architecture, not operational)
 - "The project has a scoring module" (summarizes code structure)
+- Any bullet without a **[type]** prefix
 
 Rules for the learned section:
 - Be additive: keep all existing learned items, add new ones, remove duplicates
@@ -367,19 +377,20 @@ All markdown content inside string values must be properly escaped for JSON (new
 If there's nothing worth learning from the events (routine successful operations), return:
 {"claudeMdLearnedSection": null, "skills": null, "explanations": ["No actionable patterns found in these events."]}`;
 
-export const FINGERPRINT_SYSTEM_PROMPT = `You are an expert at detecting programming languages, frameworks, and external tools/services from project file trees and dependency files.
+export const FINGERPRINT_SYSTEM_PROMPT = `You are an expert at detecting programming languages, frameworks, and external tools/services from project structure.
 
-Analyze the provided file tree and dependency file contents. Return a JSON object with:
-- "languages": array of programming languages used (e.g. "TypeScript", "Python", "Go", "Rust", "HCL")
-- "frameworks": array of frameworks and key libraries detected (e.g. "FastAPI", "React", "Celery", "Django", "Express", "Next.js", "Terraform")
-- "tools": array of external tools, services, and platforms the project integrates with — things that could have an MCP server or API integration (e.g. "PostgreSQL", "Redis", "Stripe", "Sentry", "AWS", "GCP", "GitHub", "Slack", "Docker", "Kubernetes", "Datadog", "PagerDuty", "MongoDB", "Elasticsearch")
+Analyze the provided file tree and file extension distribution. Return a JSON object with:
+- "languages": array of programming languages used, ordered by prominence in the project (most files first)
+- "frameworks": array of frameworks and key libraries detected, ordered by prominence
+- "tools": array of external tools, services, and platforms the project integrates with, ordered by prominence
 
-Be thorough — look for signals in:
-- Dependency files (package.json, pyproject.toml, requirements.txt, go.mod, Cargo.toml, etc.)
-- File extensions and directory structure
+Use the file extension distribution to determine the ordering — technologies with more files should appear first.
+
+Be thorough — reason from:
+- File extensions and their frequency distribution
+- Directory structure and naming conventions
 - Configuration files (e.g. next.config.js implies Next.js, .tf files imply Terraform + cloud providers)
 - Infrastructure-as-code files (Terraform, CloudFormation, Pulumi, Dockerfiles, k8s manifests)
 - CI/CD configs (.github/workflows, .gitlab-ci.yml, Jenkinsfile)
-- Dockerfile base images (e.g. FROM python:3.11 implies Python, FROM node:20 implies Node.js)
 
 Only include items you're confident about. Return ONLY the JSON object.`;

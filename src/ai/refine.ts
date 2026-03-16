@@ -25,7 +25,7 @@ export async function refineSetup(
         system: REFINE_SYSTEM_PROMPT,
         prompt,
         messages: conversationHistory,
-        maxTokens: 64000,
+        maxTokens: 16000,
       },
       {
         onText: (text) => {

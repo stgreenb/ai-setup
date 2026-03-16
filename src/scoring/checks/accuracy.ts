@@ -8,60 +8,13 @@ import {
 } from '../constants.js';
 import {
   collectPrimaryConfigContent,
-  extractReferences,
+  validateFileReferences,
 } from '../utils.js';
 
-/**
- * Check if file paths and references in config actually exist on disk.
- * Universal — works for any project regardless of tech stack.
- */
-function validateReferences(dir: string): {
-  valid: string[];
-  invalid: string[];
-  total: number;
-} {
-  // Only validate references from primary config files (CLAUDE.md, AGENTS.md, .cursorrules)
-  // Not from skills — skills may reference internal files (rules/, references/) within their own directory
+function validateReferences(dir: string): { valid: string[]; invalid: string[]; total: number } {
   const configContent = collectPrimaryConfigContent(dir);
   if (!configContent) return { valid: [], invalid: [], total: 0 };
-
-  const refs = extractReferences(configContent);
-  const valid: string[] = [];
-  const invalid: string[] = [];
-
-  for (const ref of refs) {
-    // Skip obvious non-path references (URLs, semver, etc.)
-    if (/^https?:\/\//.test(ref)) continue;
-    if (/^\d+\.\d+/.test(ref)) continue;
-    if (ref.startsWith('#')) continue;
-    if (ref.startsWith('@')) continue;
-
-    // Skip glob patterns (*.ts, **/*.js)
-    if (ref.includes('*')) continue;
-
-    // Skip git range patterns (origin/main..HEAD, commit1..commit2)
-    if (ref.includes('..')) continue;
-
-    // Skip references that don't have a clear directory component
-    // (single-segment names like "commander" aren't path references)
-    if (!ref.includes('/') && !ref.includes('.')) continue;
-
-    // Check if the reference exists on disk
-    const fullPath = join(dir, ref);
-    if (existsSync(fullPath)) {
-      valid.push(ref);
-    } else {
-      // Try without trailing extension variations
-      const withoutTrailing = ref.replace(/\/+$/, '');
-      if (withoutTrailing !== ref && existsSync(join(dir, withoutTrailing))) {
-        valid.push(ref);
-      } else {
-        invalid.push(ref);
-      }
-    }
-  }
-
-  return { valid, invalid, total: valid.length + invalid.length };
+  return validateFileReferences(configContent, dir);
 }
 
 /**

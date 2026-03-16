@@ -244,6 +244,76 @@ export function extractReferences(content: string): string[] {
 }
 
 /**
+ * Validate extracted references against the filesystem.
+ * Shared by both the scoring accuracy check and the score-refine loop.
+ */
+export function validateFileReferences(
+  content: string,
+  dir: string,
+  checkExists: (path: string) => boolean = existsSync,
+): { valid: string[]; invalid: string[]; total: number } {
+  const refs = extractReferences(content);
+  const valid: string[] = [];
+  const invalid: string[] = [];
+
+  for (const ref of refs) {
+    if (/^https?:\/\//.test(ref)) continue;
+    if (/^\d+\.\d+/.test(ref)) continue;
+    if (ref.startsWith('#') || ref.startsWith('@')) continue;
+    if (ref.includes('*') || ref.includes('..')) continue;
+    if (!ref.includes('/') && !ref.includes('.')) continue;
+
+    const fullPath = join(dir, ref);
+    if (checkExists(fullPath)) {
+      valid.push(ref);
+    } else {
+      const withoutTrailing = ref.replace(/\/+$/, '');
+      if (withoutTrailing !== ref && checkExists(join(dir, withoutTrailing))) {
+        valid.push(ref);
+      } else {
+        invalid.push(ref);
+      }
+    }
+  }
+
+  return { valid, invalid, total: valid.length + invalid.length };
+}
+
+/**
+ * Count concrete vs abstract lines in markdown content.
+ */
+export function countConcreteness(content: string): { concrete: number; abstract: number } {
+  let concrete = 0;
+  let abstract = 0;
+  let inCodeBlock = false;
+
+  for (const line of content.split('\n')) {
+    if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+    const classification = classifyLine(line, inCodeBlock);
+    if (classification === 'concrete') concrete++;
+    else if (classification === 'abstract') abstract++;
+  }
+
+  return { concrete, abstract };
+}
+
+/**
+ * Count lines matching directory tree patterns inside code blocks.
+ */
+export function countTreeLines(content: string): number {
+  const treeLinePattern = /[├└│─┬]/;
+  let count = 0;
+  let inCodeBlock = false;
+
+  for (const line of content.split('\n')) {
+    if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+    if (inCodeBlock && treeLinePattern.test(line)) count++;
+  }
+
+  return count;
+}
+
+/**
  * Classify a line as "concrete" (has specific project references) or "abstract" (generic prose).
  * Lines inside code blocks, with backticks, or with path-like content are concrete.
  * Returns null for neutral lines (empty, headings) that should be excluded from the ratio.

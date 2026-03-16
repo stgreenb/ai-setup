@@ -15,6 +15,7 @@ import { displayScoreSummary, displayScoreDelta } from '../scoring/display.js';
 import { SpinnerMessages, GENERATION_MESSAGES } from '../utils/spinner-messages.js';
 import { collectSetupFiles } from './setup-files.js';
 import { trackRegenerateCompleted } from '../telemetry/events.js';
+import { runScoreRefineWithSpinner } from '../ai/score-refine.js';
 
 export async function regenerateCommand(options: { dryRun?: boolean }) {
   const config = loadConfig();
@@ -86,6 +87,9 @@ export async function regenerateCommand(options: { dryRun?: boolean }) {
   }
 
   genSpinner.succeed('Setup regenerated');
+
+  // 3b. Score-based auto-refinement
+  generatedSetup = await runScoreRefineWithSpinner(generatedSetup, process.cwd(), []);
 
   // 4. Diff review
   const setupFiles = collectSetupFiles(generatedSetup, targetAgent);

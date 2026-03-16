@@ -165,6 +165,7 @@ learn
   .command('observe')
   .description('Record a tool event from stdin (called by hooks)')
   .option('--failure', 'Mark event as a tool failure')
+  .option('--prompt', 'Record a user prompt event')
   .action(tracked('learn:observe', learnObserveCommand));
 
 learn

@@ -267,4 +267,180 @@ describe('displayScore', () => {
     expect(output).toContain('FRESHNESS & SAFETY');
     expect(output).toContain('BONUS');
   });
+
+  it('renders category icons', () => {
+    const result = makeScoreResult({ score: 50, grade: 'C' });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('📁');
+    expect(output).toContain('⚡');
+    expect(output).toContain('🎯');
+    expect(output).toContain('🔍');
+    expect(output).toContain('🛡️');
+    expect(output).toContain('⭐');
+  });
+
+  it('shows category gap when earned < max', () => {
+    const result = makeScoreResult({
+      score: 50,
+      grade: 'C',
+      categories: {
+        existence: { earned: 10, max: 25 },
+        quality: { earned: 25, max: 25 },
+        grounding: { earned: 0, max: 20 },
+        accuracy: { earned: 0, max: 15 },
+        freshness: { earned: 0, max: 10 },
+        bonus: { earned: 0, max: 5 },
+      },
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('-15 available');
+    expect(output).not.toMatch(/QUALITY.*available/);
+  });
+
+  it('shows partial credit with ~ icon and earned/max fraction', () => {
+    const result = makeScoreResult({
+      score: 50,
+      grade: 'C',
+      checks: [
+        makeCheck({
+          id: 'refs',
+          name: 'References point to real files',
+          category: 'accuracy',
+          maxPoints: 8,
+          earnedPoints: 4,
+          passed: false,
+          detail: '11/21 references verified',
+        }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('~');
+    expect(output).toContain('4/8');
+    expect(output).toContain('11/21 references verified');
+  });
+
+  it('shows recovery hint for partial credit checks', () => {
+    const result = makeScoreResult({
+      score: 50,
+      grade: 'C',
+      checks: [
+        makeCheck({
+          id: 'refs',
+          name: 'References valid',
+          category: 'accuracy',
+          maxPoints: 8,
+          earnedPoints: 4,
+          passed: false,
+          detail: '11/21 verified',
+          suggestion: 'Fix invalid refs',
+        }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('Fix this for +4 more points');
+  });
+
+  it('shows 0/max for zero-point checks', () => {
+    const result = makeScoreResult({
+      score: 50,
+      grade: 'C',
+      checks: [
+        makeCheck({
+          id: 'skills',
+          name: 'Skills configured',
+          category: 'existence',
+          maxPoints: 8,
+          earnedPoints: 0,
+          passed: false,
+          detail: 'No skills found',
+        }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('0/8');
+    expect(output).toContain('No skills found');
+  });
+
+  it('shows negative points with red styling markers', () => {
+    const result = makeScoreResult({
+      score: 30,
+      grade: 'F',
+      checks: [
+        makeCheck({
+          id: 'no_secrets',
+          name: 'No secrets in config files',
+          category: 'freshness',
+          maxPoints: 4,
+          earnedPoints: -4,
+          passed: false,
+          detail: '1 potential secret found',
+          suggestion: 'Remove secrets',
+        }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('-4');
+    expect(output).toContain('No secrets in config files');
+    expect(output).toContain('Remove secrets');
+  });
+
+  it('shows top improvements sorted by potential gain', () => {
+    const result = makeScoreResult({
+      score: 30,
+      grade: 'F',
+      checks: [
+        makeCheck({ id: 'a', name: 'Small fix', category: 'existence', maxPoints: 3, earnedPoints: 0, passed: false }),
+        makeCheck({ id: 'b', name: 'Big fix', category: 'quality', maxPoints: 8, earnedPoints: 0, passed: false }),
+        makeCheck({ id: 'c', name: 'Medium fix', category: 'grounding', maxPoints: 5, earnedPoints: 2, passed: false }),
+        makeCheck({ id: 'd', name: 'Passing', category: 'accuracy', maxPoints: 7, earnedPoints: 7, passed: true }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).toContain('TOP IMPROVEMENTS');
+    const improvSection = output.slice(output.indexOf('TOP IMPROVEMENTS'));
+    const bigIdx = improvSection.indexOf('Big fix');
+    const smallIdx = improvSection.indexOf('Small fix');
+    const medIdx = improvSection.indexOf('Medium fix');
+    expect(bigIdx).toBeLessThan(smallIdx);
+    expect(smallIdx).toBeLessThan(medIdx);
+    expect(improvSection).toContain('+8 pts');
+    expect(improvSection).toContain('+3 pts');
+    expect(improvSection).not.toContain('Passing');
+  });
+
+  it('omits top improvements when all checks pass', () => {
+    const result = makeScoreResult({
+      score: 100,
+      grade: 'A',
+      checks: [
+        makeCheck({ id: 'a', name: 'Passing', category: 'existence', maxPoints: 10, earnedPoints: 10, passed: true }),
+      ],
+    });
+
+    displayScore(result);
+
+    const output = logs.join('\n');
+    expect(output).not.toContain('TOP IMPROVEMENTS');
+  });
 });

@@ -7,13 +7,13 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   codex: 'Codex',
 };
 
-const CATEGORY_LABELS: Record<CheckCategory, string> = {
-  existence: 'FILES & SETUP',
-  quality: 'QUALITY',
-  grounding: 'GROUNDING',
-  accuracy: 'ACCURACY',
-  freshness: 'FRESHNESS & SAFETY',
-  bonus: 'BONUS',
+const CATEGORY_LABELS: Record<CheckCategory, { icon: string; label: string }> = {
+  existence: { icon: '📁', label: 'FILES & SETUP' },
+  quality: { icon: '⚡', label: 'QUALITY' },
+  grounding: { icon: '🎯', label: 'GROUNDING' },
+  accuracy: { icon: '🔍', label: 'ACCURACY' },
+  freshness: { icon: '🛡️', label: 'FRESHNESS & SAFETY' },
+  bonus: { icon: '⭐', label: 'BONUS' },
 };
 
 const CATEGORY_ORDER: CheckCategory[] = ['existence', 'quality', 'grounding', 'accuracy', 'freshness', 'bonus'];
@@ -29,36 +29,70 @@ function gradeColor(grade: string): (text: string) => string {
   }
 }
 
+const GRADIENT_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
+
 function progressBar(score: number, max: number, width = 40): string {
   const filled = Math.round((score / max) * width);
   const empty = width - filled;
-  const bar = chalk.hex('#f97316')('▓'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+  let bar = '';
+  for (let i = 0; i < filled; i++) {
+    const position = i / (width - 1);
+    const colorIndex = Math.min(
+      GRADIENT_COLORS.length - 1,
+      Math.floor(position * GRADIENT_COLORS.length),
+    );
+    bar += chalk.hex(GRADIENT_COLORS[colorIndex])('▓');
+  }
+  bar += chalk.gray('░'.repeat(empty));
   return bar;
 }
 
 function formatCheck(check: Check): string {
+  const isPartial = !check.passed && check.earnedPoints > 0;
+  const isNegative = check.earnedPoints < 0;
+  const lostPoints = check.maxPoints - check.earnedPoints;
+
   const icon = check.passed
     ? chalk.green('✓')
-    : check.earnedPoints < 0
-      ? chalk.red('✗')
-      : chalk.gray('✗');
+    : isPartial
+      ? chalk.yellow('~')
+      : isNegative
+        ? chalk.red('✗')
+        : chalk.gray('✗');
 
-  const points = check.passed
-    ? chalk.green(`+${check.earnedPoints}`.padStart(4))
-    : check.earnedPoints < 0
-      ? chalk.red(`${check.earnedPoints}`.padStart(4))
-      : chalk.gray('  —');
+  let points: string;
+  if (check.passed) {
+    points = chalk.green(`+${check.earnedPoints}`.padStart(4));
+  } else if (isNegative) {
+    points = chalk.red(`${check.earnedPoints}`.padStart(4));
+  } else if (isPartial) {
+    points = chalk.yellow(`${check.earnedPoints}/${check.maxPoints}`.padStart(5));
+  } else {
+    points = chalk.gray(`0/${check.maxPoints}`.padStart(5));
+  }
 
   const name = check.passed
     ? chalk.white(check.name)
-    : chalk.gray(check.name);
+    : isNegative
+      ? chalk.red(check.name)
+      : isPartial
+        ? chalk.white(check.name)
+        : chalk.gray(check.name);
 
   const detail = check.detail ? chalk.gray(` (${check.detail})`) : '';
-  const suggestion = !check.passed && check.suggestion
-    ? chalk.gray(`\n       → ${check.suggestion}`)
-    : '';
 
-  return `  ${icon} ${name.padEnd(38)}${points}${detail}${suggestion}`;
+  let suggestion = '';
+  if (!check.passed && check.suggestion) {
+    const suggColor = isNegative ? chalk.red : chalk.yellow;
+    suggestion = suggColor(`\n       → ${check.suggestion}`);
+  }
+
+  let recovery = '';
+  if (isPartial && lostPoints > 0) {
+    recovery = chalk.yellow(`\n       ↑ Fix this for +${lostPoints} more points`);
+  }
+
+  return `  ${icon} ${name.padEnd(38)}${points}${detail}${suggestion}${recovery}`;
 }
 
 /**
@@ -84,12 +118,16 @@ export function displayScore(result: ScoreResult): void {
   for (const category of CATEGORY_ORDER) {
     const summary = result.categories[category];
     const categoryChecks = result.checks.filter((c) => c.category === category);
+    const { icon, label } = CATEGORY_LABELS[category];
+    const gap = summary.max - summary.earned;
+    const gapLabel = gap > 0 ? chalk.yellow(` (-${gap} available)`) : '';
 
     console.log(
-      chalk.gray(`  ${CATEGORY_LABELS[category]}`) +
-      chalk.gray(' '.repeat(Math.max(1, 45 - CATEGORY_LABELS[category].length))) +
+      chalk.gray(`  ${icon} ${label}`) +
+      chalk.gray(' '.repeat(Math.max(1, 43 - label.length))) +
       chalk.white(`${summary.earned}`) +
-      chalk.gray(` / ${summary.max}`)
+      chalk.gray(` / ${summary.max}`) +
+      gapLabel
     );
 
     for (const check of categoryChecks) {
@@ -97,6 +135,32 @@ export function displayScore(result: ScoreResult): void {
     }
     console.log('');
   }
+
+  // Top improvements
+  formatTopImprovements(result.checks);
+}
+
+function formatTopImprovements(checks: readonly Check[]): void {
+  const improvable = checks
+    .filter(c => c.earnedPoints < c.maxPoints)
+    .map(c => ({ name: c.name, potential: c.maxPoints - c.earnedPoints }))
+    .sort((a, b) => b.potential - a.potential)
+    .slice(0, 5);
+
+  if (improvable.length === 0) return;
+
+  console.log(chalk.gray('  ─ TOP IMPROVEMENTS ─────────────────────────────'));
+  console.log('');
+
+  for (let i = 0; i < improvable.length; i++) {
+    const item = improvable[i];
+    const num = chalk.gray(`${i + 1}.`);
+    const label = chalk.white(item.name.padEnd(42));
+    const pts = chalk.yellow(`+${item.potential} pts`);
+    console.log(`  ${num} ${label}${pts}`);
+  }
+
+  console.log('');
 }
 
 /**

@@ -18,6 +18,8 @@ import {
   estimateTokens,
   analyzeMarkdownStructure,
   classifyLine,
+  countConcreteness,
+  countTreeLines,
 } from '../utils.js';
 
 export function checkQuality(dir: string): Check[] {
@@ -93,28 +95,16 @@ export function checkQuality(dir: string): Check[] {
   });
 
   // 3. Concreteness — ratio of concrete lines vs abstract prose
-  let concreteCount = 0;
-  let abstractCount = 0;
+  const { concrete: concreteCount, abstract: abstractCount } = primaryInstructions
+    ? countConcreteness(primaryInstructions)
+    : { concrete: 0, abstract: 0 };
   const abstractExamples: string[] = [];
-
-  if (primaryInstructions) {
-    let inCodeBlock = false;
+  if (primaryInstructions && abstractCount > 0) {
+    let inCb = false;
     for (const line of primaryInstructions.split('\n')) {
-      if (line.trim().startsWith('```')) {
-        inCodeBlock = !inCodeBlock;
-        continue;
-      }
-
-      const classification = classifyLine(line, inCodeBlock);
-      if (classification === 'neutral') continue;
-
-      if (classification === 'concrete') {
-        concreteCount++;
-      } else {
-        abstractCount++;
-        if (abstractExamples.length < 3) {
-          abstractExamples.push(line.trim().slice(0, 80));
-        }
+      if (line.trim().startsWith('```')) { inCb = !inCb; continue; }
+      if (!inCb && classifyLine(line, false) === 'abstract' && abstractExamples.length < 3) {
+        abstractExamples.push(line.trim().slice(0, 80));
       }
     }
   }
@@ -149,22 +139,7 @@ export function checkQuality(dir: string): Check[] {
   });
 
   // 4. No directory tree listings
-  const treeLinePattern = /[├└│─┬]/;
-  let treeLineCount = 0;
-  let inCodeBlock = false;
-
-  if (combinedContent) {
-    for (const line of combinedContent.split('\n')) {
-      if (line.trim().startsWith('```')) {
-        inCodeBlock = !inCodeBlock;
-        continue;
-      }
-      if (inCodeBlock && treeLinePattern.test(line)) {
-        treeLineCount++;
-      }
-    }
-  }
-
+  const treeLineCount = combinedContent ? countTreeLines(combinedContent) : 0;
   const hasLargeTree = treeLineCount > 10;
   checks.push({
     id: 'no_directory_tree',

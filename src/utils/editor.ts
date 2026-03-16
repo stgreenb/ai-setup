@@ -1,6 +1,17 @@
 import { execSync, spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const IS_WINDOWS = process.platform === 'win32';
+const DIFF_TEMP_DIR = path.join(os.tmpdir(), 'caliber-diff');
+
+function getEmptyFilePath(proposedPath: string): string {
+  fs.mkdirSync(DIFF_TEMP_DIR, { recursive: true });
+  const tempPath = path.join(DIFF_TEMP_DIR, path.basename(proposedPath));
+  fs.writeFileSync(tempPath, '');
+  return tempPath;
+}
 
 export type ReviewMethod = 'cursor' | 'vscode' | 'terminal';
 
@@ -30,17 +41,12 @@ export function openDiffsInEditor(
 
   for (const file of files) {
     try {
+      const leftPath = file.originalPath ?? getEmptyFilePath(file.proposedPath);
       if (IS_WINDOWS) {
         const quote = (s: string) => `"${s}"`;
-        const parts = file.originalPath
-          ? [cmd, '--diff', quote(file.originalPath), quote(file.proposedPath)]
-          : [cmd, quote(file.proposedPath)];
-        spawn(parts.join(' '), { shell: true, stdio: 'ignore', detached: true }).unref();
+        spawn([cmd, '--diff', quote(leftPath), quote(file.proposedPath)].join(' '), { shell: true, stdio: 'ignore', detached: true }).unref();
       } else {
-        const args = file.originalPath
-          ? ['--diff', file.originalPath, file.proposedPath]
-          : [file.proposedPath];
-        spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+        spawn(cmd, ['--diff', leftPath, file.proposedPath], { stdio: 'ignore', detached: true }).unref();
       }
     } catch {
       continue;

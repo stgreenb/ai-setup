@@ -1,0 +1,56 @@
+[
+  {
+    "title": "Welcome to Caliber!",
+    "icon": "?",
+    "lines": [
+      "Caliber is your agentic development companion.",
+      "It analyzes your repository, understands how you work,",
+      "and adapts your AI agent to fit you and your project."
+    ]
+  },
+  {
+    "title": "Understanding Your Project",
+    "icon": "\u25CE",
+    "lines": [
+      "Right now, Caliber is reading your repo \u2014 file structure,",
+      "languages, tools, and conventions. This fingerprint is the",
+      "foundation everything else builds on."
+    ]
+  },
+  {
+    "title": "Tailored Configs",
+    "icon": "\u2699",
+    "lines": [
+      "That understanding becomes CLAUDE.md and .cursor/rules/ \u2014",
+      "personalized instructions your agent reads before every task.",
+      "Not generic templates. Configs shaped to your codebase."
+    ]
+  },
+  {
+    "title": "Skills for Your Workflow",
+    "icon": "\u26A1",
+    "lines": [
+      "Beyond configs, Caliber generates skills \u2014 focused",
+      "instructions for deploying, migrating, or reviewing code,",
+      "shaped to your project. Browse more with `caliber skills`."
+    ]
+  },
+  {
+    "title": "Stays in Sync",
+    "icon": "\u21BB",
+    "lines": [
+      "Your code evolves, so your configs should too.",
+      "`caliber refresh` reads recent changes and updates configs",
+      "to match. Set it as a hook and forget about it."
+    ]
+  },
+  {
+    "title": "Measures Itself",
+    "icon": "\u2605",
+    "lines": [
+      "`caliber score` checks how well your setup serves the agent \u2014",
+      "grounding, accuracy, freshness \u2014 and gives a letter grade.",
+      "Aim for an A to get the most out of your AI agent."
+    ]
+  }
+]

@@ -2,17 +2,7 @@ import { llmCall, estimateTokens } from '../llm/index.js';
 import { getFastModel } from '../llm/config.js';
 import { extractJson, stripMarkdownFences } from '../llm/utils.js';
 import { LEARN_SYSTEM_PROMPT } from './prompts.js';
-
-interface ToolEvent {
-  timestamp: string;
-  session_id: string;
-  hook_event_name: string;
-  tool_name: string;
-  tool_input: Record<string, unknown>;
-  tool_response: Record<string, unknown>;
-  tool_use_id: string;
-  cwd: string;
-}
+import type { ToolEvent, PromptEvent, SessionEvent } from '../learner/storage.js';
 
 interface LearnedSkill {
   name: string;
@@ -29,17 +19,26 @@ interface AnalysisResult {
 
 const MAX_PROMPT_TOKENS = 100_000;
 
-function formatEventsForPrompt(events: ToolEvent[]): string {
+function formatEventsForPrompt(events: SessionEvent[]): string {
   return events.map((e, i) => {
-    const status = e.hook_event_name === 'PostToolUseFailure' ? 'FAILURE' : 'SUCCESS';
-    const inputStr = JSON.stringify(e.tool_input, null, 2);
-    const responseStr = typeof e.tool_response === 'object' && '_truncated' in e.tool_response
-      ? String(e.tool_response._truncated)
-      : JSON.stringify(e.tool_response, null, 2);
+    if (e.hook_event_name === 'UserPromptSubmit') {
+      const pe = e as PromptEvent;
+      return `--- Event ${i + 1} [USER_PROMPT] ---
+Time: ${pe.timestamp}
+User said:
+${pe.prompt_content}`;
+    }
+
+    const te = e as ToolEvent;
+    const status = te.hook_event_name === 'PostToolUseFailure' ? 'FAILURE' : 'SUCCESS';
+    const inputStr = JSON.stringify(te.tool_input, null, 2);
+    const responseStr = typeof te.tool_response === 'object' && '_truncated' in te.tool_response
+      ? String(te.tool_response._truncated)
+      : JSON.stringify(te.tool_response, null, 2);
 
     return `--- Event ${i + 1} [${status}] ---
-Tool: ${e.tool_name}
-Time: ${e.timestamp}
+Tool: ${te.tool_name}
+Time: ${te.timestamp}
 Input:
 ${inputStr}
 Response:
@@ -47,7 +46,7 @@ ${responseStr}`;
   }).join('\n\n');
 }
 
-function trimEventsToFit(events: ToolEvent[], maxTokens: number): ToolEvent[] {
+function trimEventsToFit(events: SessionEvent[], maxTokens: number): SessionEvent[] {
   let formatted = formatEventsForPrompt(events);
   if (estimateTokens(formatted) <= maxTokens) return events;
 
@@ -80,7 +79,7 @@ function parseAnalysisResponse(raw: string): AnalysisResult {
 }
 
 export async function analyzeEvents(
-  events: ToolEvent[],
+  events: SessionEvent[],
   existingClaudeMd?: string,
   existingLearnedSection?: string | null,
   existingSkills?: Array<{ filename: string; content: string }>,
@@ -114,4 +113,43 @@ export async function analyzeEvents(
   });
 
   return parseAnalysisResponse(raw);
+}
+
+export interface WasteEstimate {
+  totalWasteTokens: number;
+  totalWasteSeconds: number;
+  failureCount: number;
+  promptCount: number;
+}
+
+export function calculateSessionWaste(events: SessionEvent[]): WasteEstimate {
+  let totalWasteTokens = 0;
+  let totalWasteSeconds = 0;
+  let failureCount = 0;
+  let promptCount = 0;
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
+
+    if (event.hook_event_name === 'PostToolUseFailure') {
+      const te = event as ToolEvent;
+      const inputStr = JSON.stringify(te.tool_input);
+      const responseStr = typeof te.tool_response === 'object' && '_truncated' in te.tool_response
+        ? String(te.tool_response._truncated)
+        : JSON.stringify(te.tool_response);
+      totalWasteTokens += estimateTokens(inputStr + responseStr);
+      failureCount++;
+
+      if (i > 0) {
+        const prev = new Date(events[i - 1].timestamp).getTime();
+        const curr = new Date(event.timestamp).getTime();
+        const elapsed = (curr - prev) / 1000;
+        if (elapsed > 0 && elapsed < 600) totalWasteSeconds += elapsed;
+      }
+    } else if (event.hook_event_name === 'UserPromptSubmit') {
+      promptCount++;
+    }
+  }
+
+  return { totalWasteTokens, totalWasteSeconds, failureCount, promptCount };
 }

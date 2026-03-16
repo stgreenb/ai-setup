@@ -76,13 +76,20 @@ function parseBullets(content: string): string[] {
   return bullets;
 }
 
+const TYPE_PREFIX_RE = /^\*\*\[[^\]]+\]\*\*\s*/;
+
 function normalizeBullet(bullet: string): string {
   return bullet
     .replace(/^- /, '')
+    .replace(TYPE_PREFIX_RE, '')
     .replace(/`[^`]*`/g, '')
     .replace(/\s+/g, ' ')
     .toLowerCase()
     .trim();
+}
+
+function hasTypePrefix(bullet: string): boolean {
+  return TYPE_PREFIX_RE.test(bullet.replace(/^- /, ''));
 }
 
 function deduplicateLearnedItems(
@@ -97,15 +104,19 @@ function deduplicateLearnedItems(
   for (const bullet of incomingBullets) {
     const norm = normalizeBullet(bullet);
     if (!norm) continue;
-    const isDup = merged.some(e => {
+    const dupIdx = merged.findIndex(e => {
       const eNorm = normalizeBullet(e);
-      // Require the shorter string to be at least 70% of the longer to count as duplicate
       const shorter = Math.min(norm.length, eNorm.length);
       const longer = Math.max(norm.length, eNorm.length);
       if (!(eNorm.includes(norm) || norm.includes(eNorm))) return false;
       return shorter / longer > 0.7;
     });
-    if (!isDup) {
+    if (dupIdx !== -1) {
+      // Upgrade untyped bullet to typed version
+      if (hasTypePrefix(bullet) && !hasTypePrefix(merged[dupIdx])) {
+        merged[dupIdx] = bullet;
+      }
+    } else {
       merged.push(bullet);
       newItems.push(bullet);
     }

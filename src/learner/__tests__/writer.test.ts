@@ -111,6 +111,58 @@ describe('writer', () => {
     });
   });
 
+  describe('type prefix handling', () => {
+    it('typed bullet deduplicates against untyped version', () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p) === 'CALIBER_LEARNINGS.md'
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        '# Caliber Learnings\n\n- Use pnpm for installs\n',
+      );
+
+      const result = writeLearnedContent({
+        claudeMdLearnedSection: '- **[convention]** Use pnpm for installs',
+        skills: null,
+      });
+
+      expect(result.newItemCount).toBe(0);
+      const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(written).toContain('**[convention]** Use pnpm for installs');
+      expect(written).not.toMatch(/^- Use pnpm for installs$/m);
+    });
+
+    it('typed bullet replaces untyped duplicate', () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p) === 'CALIBER_LEARNINGS.md'
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        '# Caliber Learnings\n\n- Never edit generated files\n',
+      );
+
+      writeLearnedContent({
+        claudeMdLearnedSection: '- **[correction]** Never edit generated files',
+        skills: null,
+      });
+
+      const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(written).toContain('**[correction]**');
+    });
+
+    it('typed bullets with no duplicates pass through normally', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const result = writeLearnedContent({
+        claudeMdLearnedSection: '- **[gotcha]** tsup swallows type errors\n- **[env]** DATABASE_URL must be set',
+        skills: null,
+      });
+
+      expect(result.newItemCount).toBe(2);
+      const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(written).toContain('**[gotcha]**');
+      expect(written).toContain('**[env]**');
+    });
+  });
+
   describe('writeLearnedContent', () => {
     it('creates CALIBER_LEARNINGS.md with header when no file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);

@@ -20,6 +20,16 @@ export interface ToolEvent {
   cwd: string;
 }
 
+export interface PromptEvent {
+  timestamp: string;
+  session_id: string;
+  hook_event_name: 'UserPromptSubmit';
+  prompt_content: string;
+  cwd: string;
+}
+
+export type SessionEvent = ToolEvent | PromptEvent;
+
 export interface LearningState {
   sessionId: string | null;
   eventCount: number;
@@ -67,15 +77,28 @@ export function appendEvent(event: ToolEvent): void {
   }
 }
 
-export function readAllEvents(): ToolEvent[] {
+export function appendPromptEvent(event: PromptEvent): void {
+  ensureLearningDir();
+  const filePath = sessionFilePath();
+  fs.appendFileSync(filePath, JSON.stringify(event) + '\n');
+
+  const count = getEventCount();
+  if (count > LEARNING_MAX_EVENTS) {
+    const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+    const kept = lines.slice(lines.length - LEARNING_MAX_EVENTS);
+    fs.writeFileSync(filePath, kept.join('\n') + '\n');
+  }
+}
+
+export function readAllEvents(): SessionEvent[] {
   const filePath = sessionFilePath();
   if (!fs.existsSync(filePath)) return [];
 
   const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
-  const events: ToolEvent[] = [];
+  const events: SessionEvent[] = [];
   for (const line of lines) {
     try {
-      events.push(JSON.parse(line) as ToolEvent);
+      events.push(JSON.parse(line) as SessionEvent);
     } catch {
       // Skip corrupt JSONL lines (e.g. truncated by concurrent writes)
     }
@@ -145,16 +168,6 @@ export function acquireFinalizeLock(): boolean {
     return true;
   } catch {
     // File was created between check and write — another process won
-    // Try overwriting if the existing lock is stale
-    try {
-      const stat = fs.statSync(lockPath);
-      if (Date.now() - stat.mtimeMs >= LOCK_STALE_MS) {
-        fs.writeFileSync(lockPath, String(process.pid));
-        return true;
-      }
-    } catch {
-      // Give up
-    }
     return false;
   }
 }

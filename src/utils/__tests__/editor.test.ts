@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execSync, spawn } from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 vi.mock('child_process');
+vi.mock('fs');
 
 import { detectAvailableEditors, openDiffsInEditor } from '../editor.js';
 
@@ -76,20 +80,24 @@ describe('openDiffsInEditor', () => {
     expect(mockUnref).toHaveBeenCalled();
   });
 
-  it('opens new files directly without --diff', () => {
+  it('opens new files with --diff against empty temp file', () => {
     openDiffsInEditor('vscode', [
       { proposedPath: '/tmp/proposed/new.md' },
     ]);
 
+    const expectedTempPath = path.join(os.tmpdir(), 'caliber-diff', 'new.md');
+    expect(fs.mkdirSync).toHaveBeenCalled();
+    expect(fs.writeFileSync).toHaveBeenCalledWith(expectedTempPath, '');
+
     if (IS_WINDOWS) {
       expect(spawn).toHaveBeenCalledWith(
-        'code "/tmp/proposed/new.md"',
+        `code --diff "${expectedTempPath}" "/tmp/proposed/new.md"`,
         { shell: true, stdio: 'ignore', detached: true }
       );
     } else {
       expect(spawn).toHaveBeenCalledWith(
         'code',
-        ['/tmp/proposed/new.md'],
+        ['--diff', expectedTempPath, '/tmp/proposed/new.md'],
         { stdio: 'ignore', detached: true }
       );
     }
