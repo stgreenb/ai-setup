@@ -339,7 +339,7 @@ export async function initCommand(options: InitOptions) {
       display.update(TASK_SKILLS_GEN, 'done', `${skillCount} skills`);
     })();
 
-    const SEARCH_TIMEOUT_MS = 60_000;
+    const SEARCH_TIMEOUT_MS = 120_000;
     const searchPromise = wantsSkills ? (async () => {
       display.update(TASK_SKILLS_SEARCH, 'running');
       try {

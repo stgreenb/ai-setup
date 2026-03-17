@@ -611,41 +611,24 @@ async function fetchSkillContent(rec: SkillResult): Promise<string | null> {
 
   const repoPath = rec.source_url.replace('https://github.com/', '');
 
+  const FETCH_TIMEOUT = 5_000;
+
   // Try common skill file locations in the source repo
   const candidates = [
     `https://raw.githubusercontent.com/${repoPath}/HEAD/skills/${rec.slug}/SKILL.md`,
-    `https://raw.githubusercontent.com/${repoPath}/HEAD/${rec.slug}/SKILL.md`,
     `https://raw.githubusercontent.com/${repoPath}/HEAD/.claude/skills/${rec.slug}/SKILL.md`,
-    `https://raw.githubusercontent.com/${repoPath}/HEAD/.agents/skills/${rec.slug}/SKILL.md`,
+    `https://raw.githubusercontent.com/${repoPath}/HEAD/${rec.slug}/SKILL.md`,
   ];
 
   for (const url of candidates) {
     try {
-      const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const resp = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
       if (resp.ok) {
         const text = await resp.text();
         if (text.length > 20) return text;
       }
     } catch {}
   }
-
-  // Fallback: search the repo tree for the SKILL.md file via GitHub API
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${repoPath}/git/trees/HEAD?recursive=1`,
-      { signal: AbortSignal.timeout(10_000) },
-    );
-    if (resp.ok) {
-      const tree = await resp.json() as { tree?: Array<{ path: string }> };
-      const needle = `${rec.slug}/SKILL.md`;
-      const match = tree.tree?.find(f => f.path.endsWith(needle));
-      if (match) {
-        const rawUrl = `https://raw.githubusercontent.com/${repoPath}/HEAD/${match.path}`;
-        const contentResp = await fetch(rawUrl, { signal: AbortSignal.timeout(10_000) });
-        if (contentResp.ok) return await contentResp.text();
-      }
-    }
-  } catch {}
 
   return null;
 }
