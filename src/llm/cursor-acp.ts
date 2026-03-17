@@ -1,5 +1,6 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import readline from 'node:readline';
+import os from 'node:os';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
 
 const ACP_AGENT_BIN = 'agent';
@@ -238,7 +239,7 @@ export class CursorAcpProvider implements LLMProvider {
     conn.activeCallbacks = callbacks;
     try {
       const sessionResult = await this.send(conn, 'session/new', {
-        cwd: process.cwd(),
+        cwd: os.tmpdir(),
         mcpServers: [],
       }) as { sessionId: string };
 
