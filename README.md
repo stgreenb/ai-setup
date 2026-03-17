@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/social-preview.png" alt="Caliber — AI setup tailored for your codebase" width="640">
+  <img src="assets/social-preview.png" alt="Caliber — AI setup tailored for your codebase" width="900">
 </p>
 
 <p align="center">
