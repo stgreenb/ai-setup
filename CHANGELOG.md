@@ -1,3 +1,20 @@
+## v1.24.0 (2026-03-18)
+
+### Features
+
+- **init**: update waiting cards to showcase full product value
+- always-on learning, CI integration, and agent performance insights
+
+### Bug Fixes
+
+- show waiting cards sooner by adding preview staleness check
+- add explicit vitest imports to test files for tsc compatibility
+- add explicit vitest imports to new test files for tsc compatibility
+
+### Refactoring
+
+- **init**: extract helpers, add StreamParser, DRY mergeSkillResults
+
 ## v1.23.2 (2026-03-18)
 
 ### Bug Fixes
