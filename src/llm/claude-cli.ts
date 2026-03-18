@@ -1,10 +1,25 @@
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
+import { parseSeatBasedError } from './seat-based-errors.js';
 
 const CLAUDE_CLI_BIN = 'claude';
-/** Max time for a single claude -p invocation (e.g. long generation). */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const IS_WINDOWS = process.platform === 'win32';
+
+function spawnClaude(args: string[]): ChildProcess {
+  return IS_WINDOWS
+    ? spawn([CLAUDE_CLI_BIN, ...args].join(' '), {
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'] as const,
+        env: process.env,
+        shell: true,
+      })
+    : spawn(CLAUDE_CLI_BIN, args, {
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: process.env,
+      });
+}
 
 /**
  * Provider that uses the Claude Code CLI (`claude -p "..."`).
@@ -34,27 +49,19 @@ export class ClaudeCliProvider implements LLMProvider {
     const combined = this.buildCombinedPrompt(options);
     const args = ['-p'];
     if (options.model) args.push('--model', options.model);
-    const child = IS_WINDOWS
-      ? spawn([CLAUDE_CLI_BIN, ...args].join(' '), {
-          cwd: process.cwd(),
-          stdio: ['pipe', 'pipe', 'inherit'] as const,
-          env: process.env,
-          shell: true,
-        })
-      : spawn(CLAUDE_CLI_BIN, args, {
-          cwd: process.cwd(),
-          stdio: ['pipe', 'pipe', 'inherit'],
-          env: process.env,
-        });
+    const child = spawnClaude(args);
     child.stdin!.end(combined);
 
     let settled = false;
     const chunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
 
     child.stdout!.on('data', (chunk: Buffer) => {
       chunks.push(chunk);
       callbacks.onText(chunk.toString('utf-8'));
     });
+
+    child.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
@@ -83,13 +90,16 @@ export class ClaudeCliProvider implements LLMProvider {
       if (code === 0) {
         callbacks.onEnd({ stopReason: 'end_turn' });
       } else {
+        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+        const friendly = parseSeatBasedError(stderr, code);
         const stdout = Buffer.concat(chunks).toString('utf-8').trim();
-        const msg = signal
+        const base = signal
           ? `Claude CLI killed (${signal})`
           : code != null
             ? `Claude CLI exited with code ${code}`
             : 'Claude CLI exited';
-        callbacks.onError(new Error(stdout ? `${msg}. Output: ${stdout.slice(0, 200)}` : msg));
+        const detail = friendly || stderr || (stdout ? stdout.slice(0, 200) : '');
+        callbacks.onError(new Error(detail ? `${base}. ${detail}` : base));
       }
     });
   }
@@ -97,17 +107,16 @@ export class ClaudeCliProvider implements LLMProvider {
   private buildCombinedPrompt(options: LLMCallOptions | LLMStreamOptions): string {
     const streamOpts = options as LLMStreamOptions;
     const hasHistory = streamOpts.messages && streamOpts.messages.length > 0;
-    let combined = '';
-
-    combined += '[[System]]\n' + options.system + '\n\n';
+    let combined = options.system + '\n\n';
 
     if (hasHistory) {
       for (const msg of streamOpts.messages!) {
-        combined += `[[${msg.role === 'user' ? 'User' : 'Assistant'}]]\n${msg.content}\n\n`;
+        const label = msg.role === 'user' ? 'User' : 'Assistant';
+        combined += `${label}: ${msg.content}\n\n`;
       }
     }
 
-    combined += '[[User]]\n' + options.prompt;
+    combined += options.prompt;
     return combined;
   }
 
@@ -115,22 +124,15 @@ export class ClaudeCliProvider implements LLMProvider {
     return new Promise((resolve, reject) => {
       const args = ['-p'];
       if (model) args.push('--model', model);
-      const child = IS_WINDOWS
-        ? spawn([CLAUDE_CLI_BIN, ...args].join(' '), {
-            cwd: process.cwd(),
-            stdio: ['pipe', 'pipe', 'inherit'] as const,
-            env: process.env,
-            shell: true,
-          })
-        : spawn(CLAUDE_CLI_BIN, args, {
-            cwd: process.cwd(),
-            stdio: ['pipe', 'pipe', 'inherit'],
-            env: process.env,
-          });
+      const child = spawnClaude(args);
       child.stdin!.end(combinedPrompt);
 
       const chunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+
       child.stdout!.on('data', (chunk: Buffer) => chunks.push(chunk));
+      child.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
       child.on('error', (err) => {
         clearTimeout(timer);
         reject(err);
@@ -141,12 +143,15 @@ export class ClaudeCliProvider implements LLMProvider {
         if (code === 0) {
           resolve(stdout);
         } else {
-          const msg = signal
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+          const friendly = parseSeatBasedError(stderr, code);
+          const base = signal
             ? `Claude CLI killed (${signal})`
             : code != null
               ? `Claude CLI exited with code ${code}`
               : 'Claude CLI exited';
-          reject(new Error(stdout ? `${msg}. Output: ${stdout.slice(0, 200)}` : msg));
+          const detail = friendly || stderr || (stdout ? stdout.slice(0, 200) : '');
+          reject(new Error(detail ? `${base}. ${detail}` : base));
         }
       });
 

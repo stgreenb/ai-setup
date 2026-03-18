@@ -1,9 +1,13 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
+import { parseSeatBasedError, isRateLimitError } from './seat-based-errors.js';
 
 const AGENT_BIN = 'agent';
 const IS_WINDOWS = process.platform === 'win32';
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const SIGKILL_DELAY_MS = 5000;
+const STDERR_MAX_BYTES = 10 * 1024;
 
 /**
  * Cursor provider using headless --print mode for direct LLM access.
@@ -14,10 +18,18 @@ const IS_WINDOWS = process.platform === 'win32';
 export class CursorAcpProvider implements LLMProvider {
   private defaultModel: string;
   private cursorApiKey?: string;
+  private timeoutMs: number;
+  private warmProcess: ChildProcess | null = null;
+  private warmModel: string | null = null;
 
   constructor(config: LLMConfig) {
     this.defaultModel = config.model || 'sonnet-4.6';
     this.cursorApiKey = process.env.CURSOR_API_KEY ?? process.env.CURSOR_AUTH_TOKEN;
+    const envTimeout = process.env.CALIBER_CURSOR_TIMEOUT_MS;
+    this.timeoutMs = envTimeout ? parseInt(envTimeout, 10) : DEFAULT_TIMEOUT_MS;
+    if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1000) {
+      this.timeoutMs = DEFAULT_TIMEOUT_MS;
+    }
   }
 
   async call(options: LLMCallOptions): Promise<string> {
@@ -30,6 +42,32 @@ export class CursorAcpProvider implements LLMProvider {
     const prompt = this.buildPrompt(options);
     const model = options.model || this.defaultModel;
     return this.runPrintStream(model, prompt, callbacks);
+  }
+
+  /**
+   * Pre-spawn an agent process so it's ready when the first call comes.
+   * Call this during fingerprint collection to hide spawn latency.
+   */
+  prewarm(model?: string): void {
+    const targetModel = model || this.defaultModel;
+    if (this.warmProcess && !this.warmProcess.killed && this.warmModel === targetModel) return;
+
+    const args = this.buildArgs(targetModel, false);
+    this.warmProcess = spawn(AGENT_BIN, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ...(this.cursorApiKey && { CURSOR_API_KEY: this.cursorApiKey }) },
+      ...(IS_WINDOWS && { shell: true }),
+    });
+    this.warmModel = targetModel;
+
+    this.warmProcess.on('error', () => {
+      this.warmProcess = null;
+      this.warmModel = null;
+    });
+    this.warmProcess.on('close', () => {
+      this.warmProcess = null;
+      this.warmModel = null;
+    });
   }
 
   private buildArgs(model: string, streaming: boolean): string[] {
@@ -50,27 +88,86 @@ export class CursorAcpProvider implements LLMProvider {
     return args;
   }
 
+  private takeWarmProcess(model: string, streaming: boolean): ChildProcess | null {
+    if (!streaming && this.warmProcess && !this.warmProcess.killed && this.warmModel === model) {
+      const proc = this.warmProcess;
+      this.warmProcess = null;
+      this.warmModel = null;
+      return proc;
+    }
+    return null;
+  }
+
+  private spawnAgent(model: string, streaming: boolean): { child: ChildProcess; stderrChunks: Buffer[] } {
+    const warm = this.takeWarmProcess(model, streaming);
+    if (warm) {
+      const stderrChunks: Buffer[] = [];
+      warm.stderr?.on('data', (chunk: Buffer) => {
+        if (Buffer.concat(stderrChunks).length < STDERR_MAX_BYTES) stderrChunks.push(chunk);
+      });
+      return { child: warm, stderrChunks };
+    }
+
+    const args = this.buildArgs(model, streaming);
+    const child = spawn(AGENT_BIN, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ...(this.cursorApiKey && { CURSOR_API_KEY: this.cursorApiKey }) },
+      ...(IS_WINDOWS && { shell: true }),
+    });
+
+    const stderrChunks: Buffer[] = [];
+    child.stderr!.on('data', (chunk: Buffer) => {
+      if (Buffer.concat(stderrChunks).length < STDERR_MAX_BYTES) stderrChunks.push(chunk);
+    });
+
+    return { child, stderrChunks };
+  }
+
+  private killWithEscalation(child: ChildProcess): void {
+    child.kill('SIGTERM');
+    const killTimer = setTimeout(() => {
+      if (!child.killed) child.kill('SIGKILL');
+    }, SIGKILL_DELAY_MS);
+    killTimer.unref();
+  }
+
+  private buildErrorMessage(code: number | null, stderrChunks: Buffer[]): string {
+    const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+    const parsed = parseSeatBasedError(stderr, code);
+    if (parsed) return parsed;
+    const base = `Cursor agent exited with code ${code}`;
+    return stderr ? `${base}: ${stderr.slice(0, 200)}` : base;
+  }
+
   private runPrint(model: string, prompt: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const args = this.buildArgs(model, false);
-      const child = spawn(AGENT_BIN, args, {
-        stdio: ['pipe', 'pipe', 'ignore'],
-        env: { ...process.env, ...(this.cursorApiKey && { CURSOR_API_KEY: this.cursorApiKey }) },
-        ...(IS_WINDOWS && { shell: true }),
-      });
-
+      const { child, stderrChunks } = this.spawnAgent(model, false);
+      let settled = false;
       const chunks: Buffer[] = [];
 
-      child.stdout!.on('data', (data: Buffer) => {
-        chunks.push(data);
+      child.stdout!.on('data', (data: Buffer) => chunks.push(data));
+
+      const timer = setTimeout(() => {
+        this.killWithEscalation(child);
+        if (!settled) {
+          settled = true;
+          reject(new Error(`Cursor agent timed out after ${this.timeoutMs / 1000}s. Set CALIBER_CURSOR_TIMEOUT_MS to increase.`));
+        }
+      }, this.timeoutMs);
+      timer.unref();
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        if (!settled) { settled = true; reject(err); }
       });
 
-      child.on('error', reject);
-
       child.on('close', (code) => {
+        clearTimeout(timer);
+        if (settled) return;
+        settled = true;
         const output = Buffer.concat(chunks).toString('utf-8').trim();
         if (code !== 0 && !output) {
-          reject(new Error(`Cursor agent exited with code ${code}`));
+          reject(new Error(this.buildErrorMessage(code, stderrChunks)));
         } else {
           resolve(output);
         }
@@ -83,15 +180,21 @@ export class CursorAcpProvider implements LLMProvider {
 
   private runPrintStream(model: string, prompt: string, callbacks: LLMStreamCallbacks): Promise<void> {
     return new Promise((resolve, reject) => {
-      const args = this.buildArgs(model, true);
-      const child = spawn(AGENT_BIN, args, {
-        stdio: ['pipe', 'pipe', 'ignore'],
-        env: { ...process.env, ...(this.cursorApiKey && { CURSOR_API_KEY: this.cursorApiKey }) },
-        ...(IS_WINDOWS && { shell: true }),
-      });
-
+      const { child, stderrChunks } = this.spawnAgent(model, true);
       let buffer = '';
       let endCalled = false;
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        this.killWithEscalation(child);
+        if (!settled) {
+          settled = true;
+          const err = new Error(`Cursor agent timed out after ${this.timeoutMs / 1000}s. Set CALIBER_CURSOR_TIMEOUT_MS to increase.`);
+          callbacks.onError(err);
+          reject(err);
+        }
+      }, this.timeoutMs);
+      timer.unref();
 
       child.stdout!.on('data', (data: Buffer) => {
         buffer += data.toString('utf-8');
@@ -126,25 +229,31 @@ export class CursorAcpProvider implements LLMProvider {
               callbacks.onEnd({ stopReason });
             }
           } catch {
-            // Not JSON — treat as plain text
             callbacks.onText(line);
           }
         }
       });
 
       child.on('error', (err) => {
-        callbacks.onError(err);
-        reject(err);
+        clearTimeout(timer);
+        if (!settled) { settled = true; callbacks.onError(err); reject(err); }
       });
 
       child.on('close', (code) => {
+        clearTimeout(timer);
+        if (settled) return;
+        settled = true;
+
         // Flush remaining buffer
         if (buffer.trim()) {
           try {
             const event = JSON.parse(buffer) as { type?: string; content?: string; result?: string; is_error?: boolean; message?: { content?: Array<{ type?: string; text?: string }> } };
             if (event.type === 'assistant') {
-              const text = event.message?.content?.[0]?.text || event.content;
-              if (text) callbacks.onText(text);
+              const isDelta = 'timestamp_ms' in (event as Record<string, unknown>);
+              if (isDelta) {
+                const text = event.message?.content?.[0]?.text || event.content;
+                if (text) callbacks.onText(text);
+              }
             } else if (event.type === 'result') {
               endCalled = true;
               callbacks.onEnd({ stopReason: event.is_error ? 'error' : 'end_turn' });
@@ -154,15 +263,22 @@ export class CursorAcpProvider implements LLMProvider {
           }
         }
 
-        // Ensure onEnd is called even if no result event was received
         if (!endCalled) {
           callbacks.onEnd({ stopReason: code === 0 ? 'end_turn' : 'error' });
         }
 
         if (code !== 0 && code !== null) {
-          const err = new Error(`Cursor agent exited with code ${code}`);
-          callbacks.onError(err);
-          reject(err);
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+          if (isRateLimitError(stderr)) {
+            // Don't reject on rate limit — let the retry logic in index.ts handle it
+            const err = new Error('Rate limit exceeded');
+            callbacks.onError(err);
+            reject(err);
+          } else {
+            const err = new Error(this.buildErrorMessage(code, stderrChunks));
+            callbacks.onError(err);
+            reject(err);
+          }
         } else {
           resolve();
         }
@@ -190,12 +306,22 @@ export class CursorAcpProvider implements LLMProvider {
   }
 }
 
-/** Check if Cursor agent CLI is available (e.g. user ran `cursor.com/install` and optionally `agent login`). */
+/** Check if Cursor agent CLI is available. */
 export function isCursorAgentAvailable(): boolean {
   try {
-    const cmd = process.platform === 'win32' ? `where ${AGENT_BIN}` : `which ${AGENT_BIN}`;
+    const cmd = IS_WINDOWS ? `where ${AGENT_BIN}` : `which ${AGENT_BIN}`;
     execSync(cmd, { stdio: 'ignore' });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Check if user is logged in to Cursor agent. */
+export function isCursorLoggedIn(): boolean {
+  try {
+    const result = execSync(`${AGENT_BIN} status`, { stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 });
+    return !result.toString().includes('not logged in');
   } catch {
     return false;
   }

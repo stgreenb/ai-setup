@@ -16,11 +16,15 @@ function mockPrintAgent(output: string, exitCode = 0) {
   const child = new EventEmitter() as EventEmitter & {
     stdin: Writable;
     stdout: EventEmitter;
+    stderr: EventEmitter;
     kill: ReturnType<typeof vi.fn>;
+    killed: boolean;
   };
   child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
   child.stdin = new Writable({ write(_chunk, _enc, cb) { cb(); } });
   child.kill = vi.fn();
+  child.killed = false;
 
   spawn.mockReturnValue(child);
 

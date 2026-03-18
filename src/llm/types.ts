@@ -1,5 +1,11 @@
 export type ProviderType = 'anthropic' | 'vertex' | 'openai' | 'cursor' | 'claude-cli';
 
+const SEAT_BASED_PROVIDERS: ReadonlySet<ProviderType> = new Set(['cursor', 'claude-cli']);
+
+export function isSeatBased(provider: ProviderType | string): boolean {
+  return SEAT_BASED_PROVIDERS.has(provider as ProviderType);
+}
+
 export interface LLMConfig {
   provider: ProviderType;
   model: string;

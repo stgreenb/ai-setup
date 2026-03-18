@@ -3,7 +3,7 @@ import select from '@inquirer/select';
 import confirm from '@inquirer/confirm';
 import { writeConfigFile, DEFAULT_MODELS } from '../llm/config.js';
 import type { ProviderType, LLMConfig } from '../llm/types.js';
-import { isCursorAgentAvailable } from '../llm/cursor-acp.js';
+import { isCursorAgentAvailable, isCursorLoggedIn } from '../llm/cursor-acp.js';
 import { isClaudeCliAvailable } from '../llm/claude-cli.js';
 import { promptInput } from '../utils/prompt.js';
 
@@ -53,8 +53,11 @@ export async function runInteractiveProviderSetup(options?: {
         console.log(chalk.dim('  Then run ') + chalk.hex('#83D1EB')('agent login') + chalk.dim(' to authenticate.\n'));
         const proceed = await confirm({ message: 'Continue anyway?' });
         if (!proceed) throw new Error('__exit__');
-      } else {
-        console.log(chalk.dim("  Run `agent login` if you haven't, or set CURSOR_API_KEY."));
+      } else if (!isCursorLoggedIn()) {
+        console.log(chalk.yellow('\n  Cursor Agent CLI found but not logged in.'));
+        console.log(chalk.dim('  Run ') + chalk.hex('#83D1EB')('agent login') + chalk.dim(' to authenticate.\n'));
+        const proceed = await confirm({ message: 'Continue anyway?' });
+        if (!proceed) throw new Error('__exit__');
       }
       break;
     }

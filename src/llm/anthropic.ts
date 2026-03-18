@@ -30,8 +30,8 @@ export class AnthropicProvider implements LLMProvider {
       });
     }
 
-    const block = response.content[0];
-    return block.type === 'text' ? block.text : '';
+    const block = response.content?.[0];
+    return block?.type === 'text' ? block.text : '';
   }
 
   async listModels(): Promise<string[]> {

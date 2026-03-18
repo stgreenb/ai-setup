@@ -10,6 +10,7 @@ import { isModelNotAvailableError, handleModelNotAvailable } from './model-recov
 
 export type { LLMProvider, LLMConfig, LLMCallOptions };
 export type { LLMStreamOptions, LLMStreamCallbacks, ProviderType } from './types.js';
+export { isSeatBased } from './types.js';
 export { loadConfig, writeConfigFile, getConfigFilePath, getFastModel } from './config.js';
 export { parseJsonResponse, extractJson, estimateTokens };
 export { isModelNotAvailableError, handleModelNotAvailable } from './model-recovery.js';
@@ -117,12 +118,12 @@ export async function llmCall(options: LLMCallOptions): Promise<string> {
       }
 
       if (isOverloaded(error) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
         continue;
       }
 
       if (isTransientError(error) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
         continue;
       }
 
@@ -153,7 +154,8 @@ export async function validateModel(options?: { fast?: boolean }): Promise<void>
   if (!config) return;
 
   // Seat-based providers use whatever model the service provides; skip validation
-  if (config.provider === 'cursor' || config.provider === 'claude-cli') return;
+  const { isSeatBased } = await import('./types.js');
+  if (isSeatBased(config.provider)) return;
 
   const modelsToCheck = [config.model];
   if (options?.fast) {

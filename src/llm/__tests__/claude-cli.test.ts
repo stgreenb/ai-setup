@@ -27,6 +27,7 @@ describe('ClaudeCliProvider', () => {
           if (ev === 'data') setTimeout(() => stdoutChunks.forEach(fn), 0);
         }),
       },
+      stderr: { on: vi.fn() },
       on: vi.fn((ev: string, fn: (code: number) => void) => {
         if (ev === 'close') closeCb = fn;
       }),
@@ -71,6 +72,7 @@ describe('ClaudeCliProvider', () => {
           if (ev === 'data') setTimeout(() => fn(Buffer.from('Streamed response.')), 0);
         }),
       },
+      stderr: { on: vi.fn() },
       on: vi.fn((ev: string, fn: (code: number) => void) => {
         if (ev === 'close') closeCb = fn;
       }),
@@ -104,6 +106,7 @@ describe('ClaudeCliProvider', () => {
           if (ev === 'data') setTimeout(() => stdoutChunks.forEach(fn), 0);
         }),
       },
+      stderr: { on: vi.fn() },
       on: vi.fn((ev: string, fn: (code: number) => void) => {
         if (ev === 'close') closeCb = fn;
       }),
@@ -142,6 +145,7 @@ describe('ClaudeCliProvider', () => {
           if (ev === 'data') setTimeout(() => stdoutChunks.forEach(fn), 0);
         }),
       },
+      stderr: { on: vi.fn() },
       on: vi.fn((ev: string, fn: (code: number) => void) => {
         if (ev === 'close') closeCb = fn;
       }),
@@ -173,6 +177,7 @@ describe('ClaudeCliProvider', () => {
           if (ev === 'data') setTimeout(() => fn(Buffer.from('ok')), 0);
         }),
       },
+      stderr: { on: vi.fn() },
       on: vi.fn((ev: string, fn: (code: number) => void) => {
         if (ev === 'close') closeCb = fn;
       }),
