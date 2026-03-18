@@ -1,3 +1,10 @@
+## v1.23.2 (2026-03-18)
+
+### Bug Fixes
+
+- **ci**: gate publish workflows on CI success via workflow_run
+- **ci**: add tsc check to publish workflows to gate on type errors
+
 ## v1.23.1 (2026-03-18)
 
 ## v1.23.0 (2026-03-18)
