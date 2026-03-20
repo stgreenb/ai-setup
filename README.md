@@ -1,5 +1,5 @@
 <p align="center">
-  <video src="assets/demo-video.mp4" autoplay loop muted playsinline width="900"></video>
+  <video src="assets/demo-header.mp4" autoplay loop muted playsinline width="900"></video>
 </p>
 
 <p align="center">
