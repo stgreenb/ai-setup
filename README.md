@@ -28,10 +28,6 @@ Score your AI agent config in 3 seconds. No API key. No changes to your code. Ju
 
 Caliber scores, generates, and keeps your AI agent configs in sync with your codebase. It fingerprints your project — languages, frameworks, dependencies, architecture — and produces tailored configs for **Claude Code**, **Cursor**, and **OpenAI Codex**. When your code evolves, Caliber detects the drift and updates your configs to match.
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Caliber demo" width="640">
-</p>
-
 ## Before / After
 
 Most repos start with a hand-written `CLAUDE.md` and nothing else. Here's what Caliber finds — and fixes:
