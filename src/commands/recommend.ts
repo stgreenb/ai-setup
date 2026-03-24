@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import select from '@inquirer/select';
 import { mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { collectFingerprint, Fingerprint } from '../fingerprint/index.js';
 import { scanLocalState } from '../scanner/index.js';
 import { llmJsonCall } from '../llm/index.js';
@@ -37,14 +37,25 @@ function detectLocalPlatforms(): Platform[] {
   return platforms.size > 0 ? Array.from(platforms) : ['claude'];
 }
 
+function sanitizeSlug(slug: string): string {
+  return slug.replace(/[^a-zA-Z0-9_\-]/g, '-').replace(/^-+|-+$/g, '');
+}
+
 function getSkillPath(platform: Platform, slug: string): string {
-  if (platform === 'cursor') {
-    return join('.cursor', 'skills', slug, 'SKILL.md');
+  const safe = sanitizeSlug(slug);
+  if (!safe) throw new Error(`Invalid skill slug: "${slug}"`);
+
+  const baseDir = platform === 'cursor' ? join('.cursor', 'skills')
+    : platform === 'codex' ? join('.agents', 'skills')
+    : join('.claude', 'skills');
+
+  const cwd = process.cwd();
+  const fullPath = resolve(cwd, baseDir, safe, 'SKILL.md');
+  if (!fullPath.startsWith(resolve(cwd, baseDir) + '/')) {
+    throw new Error(`Skill path escapes base directory: "${slug}"`);
   }
-  if (platform === 'codex') {
-    return join('.agents', 'skills', slug, 'SKILL.md');
-  }
-  return join('.claude', 'skills', slug, 'SKILL.md');
+
+  return join(baseDir, safe, 'SKILL.md');
 }
 
 function getSkillDir(platform: Platform): string {
