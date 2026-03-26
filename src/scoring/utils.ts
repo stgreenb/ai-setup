@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { execFileSync } from 'child_process';
-import { join, relative } from 'path';
+import { join, relative, dirname } from 'path';
+import { homedir } from 'os';
 
 export function readFileOrNull(filePath: string): string | null {
   try {
@@ -134,10 +135,14 @@ export function collectProjectStructure(dir: string, maxDepth = 2): ProjectStruc
 export function collectPrimaryConfigContent(dir: string): string {
   const parts: string[] = [];
 
-  for (const file of ['CLAUDE.md', '.cursorrules', 'AGENTS.md']) {
+  for (const file of ['CLAUDE.md', '.cursorrules', 'AGENTS.md', 'opencode.json']) {
     const content = readFileOrNull(join(dir, file));
     if (content) parts.push(content);
   }
+
+  // Also check global OpenCode config
+  const globalOpenCodeConfig = readFileOrNull(join(homedir(), '.config', 'opencode', 'opencode.json'));
+  if (globalOpenCodeConfig) parts.push(globalOpenCodeConfig);
 
   // Cursor .mdc rules (always loaded via frontmatter matching)
   try {
@@ -159,7 +164,7 @@ export function collectPrimaryConfigContent(dir: string): string {
 export function collectAllConfigContent(dir: string): string {
   const parts: string[] = [collectPrimaryConfigContent(dir)];
 
-  // Skills
+  // Claude/Codex skills
   for (const skillsDir of [join(dir, '.claude', 'skills'), join(dir, '.agents', 'skills')]) {
     try {
       const entries = readdirSync(skillsDir, { withFileTypes: true });
@@ -173,6 +178,26 @@ export function collectAllConfigContent(dir: string): string {
         }
       }
     } catch { /* dir doesn't exist */ }
+  }
+
+  // OpenCode skills, commands, and agents (project + global)
+  const opencodeDirs = [
+    join(dir, '.opencode'),
+    join(homedir(), '.config', 'opencode'),
+  ];
+  for (const opencodeBase of opencodeDirs) {
+    for (const subDir of ['skills', 'commands', 'agents']) {
+      const opencodeDir = join(opencodeBase, subDir);
+      try {
+        const entries = readdirSync(opencodeDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isFile() && entry.name.endsWith('.md')) {
+            const content = readFileOrNull(join(opencodeDir, entry.name));
+            if (content) parts.push(content);
+          }
+        }
+      } catch { /* dir doesn't exist */ }
+    }
   }
 
   return parts.join('\n');

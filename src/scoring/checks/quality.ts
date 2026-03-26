@@ -29,6 +29,7 @@ export function checkQuality(dir: string): Check[] {
   const claudeMd = readFileOrNull(join(dir, 'CLAUDE.md'));
   const cursorrules = readFileOrNull(join(dir, '.cursorrules'));
   const agentsMd = readFileOrNull(join(dir, 'AGENTS.md'));
+  const opencodeJson = readFileOrNull(join(dir, 'opencode.json'));
 
   const allContent = [claudeMd, cursorrules, agentsMd].filter(Boolean) as string[];
   const combinedContent = allContent.join('\n');

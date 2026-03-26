@@ -12,6 +12,7 @@ export const DEFAULT_MODELS: Record<ProviderType, string> = {
   openai: 'gpt-4.1',
   cursor: 'sonnet-4.6',
   'claude-cli': 'default',
+  opencode: 'default',
 };
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -101,6 +102,15 @@ export function resolveFromEnv(): LLMConfig | null {
     };
   }
 
+  // Prefer OpenCode (uses OpenCode's auth via opencode auth login)
+  if (process.env.CALIBER_USE_OPENCODE === '1' || process.env.CALIBER_USE_OPENCODE === 'true') {
+    return {
+      provider: 'opencode',
+      model: process.env.OPENCODE_MODEL || DEFAULT_MODELS.opencode,
+      baseUrl: process.env.OPENCODE_BASE_URL,
+    };
+  }
+
   return null;
 }
 
@@ -109,7 +119,7 @@ export function readConfigFile(): LLMConfig | null {
     if (!fs.existsSync(CONFIG_FILE)) return null;
     const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (!parsed.provider || !['anthropic', 'vertex', 'openai', 'cursor', 'claude-cli'].includes(parsed.provider as string)) {
+    if (!parsed.provider || !['anthropic', 'vertex', 'openai', 'cursor', 'claude-cli', 'opencode'].includes(parsed.provider as string)) {
       return null;
     }
     return parsed as unknown as LLMConfig;

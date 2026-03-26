@@ -15,7 +15,11 @@ const CONFIG_FILE_TYPES = `You understand these config files:
 - .cursorrules: Coding rules for Cursor (deprecated legacy format — do NOT generate this).
 - .cursor/rules/*.mdc: Modern Cursor rules with frontmatter (description, globs, alwaysApply).
 - .github/copilot-instructions.md: Always-on repository-wide instructions for GitHub Copilot — same purpose as CLAUDE.md but for Copilot. Plain markdown, no frontmatter.
-- .github/instructions/*.instructions.md: Path-specific instruction files for GitHub Copilot with YAML frontmatter containing an \`applyTo\` glob pattern (e.g. \`applyTo: "**/*.ts,**/*.tsx"\`). Only loaded when Copilot is working on matching files.`;
+- .github/instructions/*.instructions.md: Path-specific instruction files for GitHub Copilot with YAML frontmatter containing an \`applyTo\` glob pattern (e.g. \`applyTo: "**/*.ts,**/*.tsx"\`). Only loaded when Copilot is working on matching files.
+- opencode.json: Project config for OpenCode — model, provider, MCP servers, permissions, autoupdate. Located at project root or ~/.config/opencode/opencode.json.
+- .opencode/skills/{name}.md: OpenCode skills following OpenSkills format (same as Claude Code skills).
+- .opencode/commands/{name}.md: Custom commands for OpenCode.
+- .opencode/agents/{name}.md: Custom agents for OpenCode.`;
 
 const EXCLUSIONS = `Do NOT generate .claude/settings.json, .claude/settings.local.json, or mcpServers — those are managed separately.`;
 
@@ -42,7 +46,7 @@ Omit empty categories. Keep each reason punchy and specific. End with a blank li
 
 3. The JSON object starting with {.`;
 
-const FILE_DESCRIPTIONS_RULES = `The "fileDescriptions" object MUST include a one-liner for every file that will be created or modified. Use actual file paths as keys (e.g. "CLAUDE.md", "AGENTS.md", ".claude/skills/my-skill/SKILL.md", ".agents/skills/my-skill/SKILL.md", ".cursor/skills/my-skill/SKILL.md", ".cursor/rules/my-rule.mdc"). Each description should explain why the change is needed, be concise and lowercase.
+const FILE_DESCRIPTIONS_RULES = `The "fileDescriptions" object MUST include a one-liner for every file that will be created or modified. Use actual file paths as keys (e.g. "CLAUDE.md", "AGENTS.md", ".claude/skills/my-skill/SKILL.md", ".agents/skills/my-skill/SKILL.md", ".cursor/skills/my-skill/SKILL.md", ".cursor/rules/my-rule.mdc", "opencode.json", ".opencode/skills/my-skill.md", ".opencode/commands/my-command.md", ".opencode/agents/my-agent.md"). Each description should explain why the change is needed, be concise and lowercase.
 
 The "deletions" array should list files that should be removed (e.g. duplicate skills, stale configs). Include a reason for each. Omit the array or leave empty if nothing should be deleted.`;
 
@@ -123,7 +127,7 @@ ${OUTPUT_FORMAT}
 
 AgentSetup schema:
 {
-  "targetAgent": ["claude", "cursor", "codex", "github-copilot"] (array of selected agents),
+  "targetAgent": ["claude", "cursor", "codex", "github-copilot", "opencode"] (array of selected agents),
   "fileDescriptions": {
     "<file-path>": "reason for this change (max 80 chars)"
   },
@@ -145,6 +149,12 @@ AgentSetup schema:
   "copilot": {
     "instructions": "string (markdown content for .github/copilot-instructions.md — same quality/structure as CLAUDE.md)",
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter, e.g. ---\\napplyTo: \\"**/*.ts,**/*.tsx\\"\\n---\\n\\nInstructions here)" }]
+  },
+  "opencode": {
+    "opencodeJson": "string (JSON content for opencode.json — model, provider, MCP servers, permissions, autoupdate)",
+    "skills": [{ "name": "string (kebab-case)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body)" }],
+    "commands": [{ "name": "string", "description": "string", "content": "string (markdown body with template and description)" }],
+    "agents": [{ "name": "string", "description": "string", "content": "string (markdown body with prompt and tools)" }]
   }
 }
 
@@ -169,7 +179,7 @@ ${OUTPUT_FORMAT}
 
 CoreSetup schema:
 {
-  "targetAgent": ["claude", "cursor", "codex", "github-copilot"] (array of selected agents),
+  "targetAgent": ["claude", "cursor", "codex", "github-copilot", "opencode"] (array of selected agents),
   "fileDescriptions": {
     "<file-path>": "reason for this change (max 80 chars)"
   },
@@ -191,6 +201,10 @@ CoreSetup schema:
   "copilot": {
     "instructions": "string (markdown content for .github/copilot-instructions.md — same quality/structure as CLAUDE.md)",
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter)" }]
+  },
+  "opencode": {
+    "opencodeJson": "string (JSON content for opencode.json — model, provider, MCP servers, permissions, autoupdate)",
+    "skillTopics": [{ "name": "string (kebab-case)", "description": "string (what this skill does and WHEN to use it — include trigger phrases)" }]
   }
 }
 
@@ -253,7 +267,7 @@ Apply the requested changes to the setup and return the complete updated AgentSe
 
 AgentSetup schema:
 {
-  "targetAgent": ["claude", "cursor", "codex", "github-copilot"] (array of selected agents),
+  "targetAgent": ["claude", "cursor", "codex", "github-copilot", "opencode"] (array of selected agents),
   "fileDescriptions": {
     "<file-path>": "reason for this change (max 80 chars)"
   },
@@ -275,6 +289,12 @@ AgentSetup schema:
   "copilot": {
     "instructions": "string (markdown content for .github/copilot-instructions.md)",
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter)" }]
+  },
+  "opencode": {
+    "opencodeJson": "string (JSON content for opencode.json)",
+    "skills": [{ "name": "string (kebab-case)", "description": "string", "content": "string (markdown body)" }],
+    "commands": [{ "name": "string", "description": "string", "content": "string" }],
+    "agents": [{ "name": "string", "description": "string", "content": "string" }]
   }
 }
 

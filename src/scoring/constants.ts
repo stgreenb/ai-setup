@@ -19,6 +19,7 @@ export const CATEGORY_MAX = {
 // ── Existence checks (25 pts) ─────────────────────────────────────────
 export const POINTS_CLAUDE_MD_EXISTS = 6;
 export const POINTS_CURSOR_RULES_EXIST = 3;
+export const POINTS_OPENCODE_JSON_EXISTS = 6;
 export const POINTS_SKILLS_EXIST = 6;
 export const POINTS_SKILLS_BONUS_PER_EXTRA = 1;
 export const POINTS_SKILLS_BONUS_CAP = 2;
@@ -153,6 +154,13 @@ export const CODEX_ONLY_CHECKS = new Set([
 
 export const COPILOT_ONLY_CHECKS = new Set([
   'copilot_instructions_exists',
+]);
+
+export const OPENCODE_ONLY_CHECKS = new Set([
+  'opencode_json_exists',
+  'opencode_skills_exist',
+  'opencode_commands_exist',
+  'opencode_agents_exist',
 ]);
 
 /** Checks that should NOT appear for codex targets (avoid double-counting). */

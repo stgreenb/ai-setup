@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { homedir } from 'os';
 import type { Check } from '../index.js';
 import {
   POINTS_CLAUDE_MD_EXISTS,
   POINTS_CURSOR_RULES_EXIST,
+  POINTS_OPENCODE_JSON_EXISTS,
   POINTS_SKILLS_EXIST,
   POINTS_SKILLS_BONUS_PER_EXTRA,
   POINTS_SKILLS_BONUS_CAP,
@@ -48,6 +50,17 @@ function hasMcpServers(dir: string): { count: number; sources: string[] } {
   }
 
   return { count, sources };
+}
+
+function findOpenCodeConfig(dir: string): { exists: boolean; locations: string[] } {
+  const locations: string[] = [];
+  const globalPath = join(homedir(), '.config', 'opencode', 'opencode.json');
+  const projectPath = join(dir, 'opencode.json');
+
+  if (existsSync(globalPath)) locations.push(globalPath);
+  if (existsSync(projectPath)) locations.push(projectPath);
+
+  return { exists: locations.length > 0, locations };
 }
 
 export function checkExistence(dir: string): Check[] {
@@ -129,6 +142,80 @@ export function checkExistence(dir: string): Check[] {
       data: { file: '.github/copilot-instructions.md' },
       instruction: 'Create .github/copilot-instructions.md with project context for GitHub Copilot.',
     },
+  });
+
+  // 2d. opencode.json exists (check multiple locations)
+  const opencodeConfig = findOpenCodeConfig(dir);
+  const opencodeJsonExists = opencodeConfig.exists;
+  checks.push({
+    id: 'opencode_json_exists',
+    name: 'opencode.json exists',
+    category: 'existence',
+    maxPoints: POINTS_OPENCODE_JSON_EXISTS,
+    earnedPoints: opencodeJsonExists ? POINTS_OPENCODE_JSON_EXISTS : 0,
+    passed: opencodeJsonExists,
+    detail: opencodeJsonExists
+      ? `Found at: ${opencodeConfig.locations.join(', ')}`
+      : 'Not found in project or global config',
+    suggestion: opencodeJsonExists ? undefined : 'Create opencode.json with project context for OpenCode',
+    fix: opencodeJsonExists ? undefined : {
+      action: 'create_file',
+      data: { file: 'opencode.json' },
+      instruction: 'Create opencode.json with project context and settings for OpenCode.',
+    },
+  });
+
+  // 2e. OpenCode skills exist
+  const opencodeSkills = countFiles(join(dir, '.opencode', 'skills'), /SKILL\.md$/);
+  const opencodeSkillsCount = opencodeSkills.length;
+  checks.push({
+    id: 'opencode_skills_exist',
+    name: 'OpenCode skills configured',
+    category: 'existence',
+    maxPoints: POINTS_SKILLS_EXIST,
+    earnedPoints: opencodeSkillsCount >= 1 ? POINTS_SKILLS_EXIST : 0,
+    passed: opencodeSkillsCount >= 1,
+    detail: opencodeSkillsCount === 0
+      ? 'No OpenCode skills found'
+      : `${opencodeSkillsCount} OpenCode skill${opencodeSkillsCount === 1 ? '' : 's'} found`,
+    suggestion: opencodeSkillsCount === 0
+      ? 'Add .opencode/skills/ with project-specific workflow skills'
+      : undefined,
+    fix: opencodeSkillsCount === 0
+      ? {
+          action: 'create_skills',
+          data: { currentCount: 0 },
+          instruction: 'Create .opencode/skills/ with project-specific workflow skills.',
+        }
+      : undefined,
+  });
+
+  // 2f. OpenCode commands exist
+  const opencodeCommands = countFiles(join(dir, '.opencode', 'commands'), /\.md$/);
+  checks.push({
+    id: 'opencode_commands_exist',
+    name: 'OpenCode commands configured',
+    category: 'existence',
+    maxPoints: 2,
+    earnedPoints: opencodeCommands.length >= 1 ? 2 : 0,
+    passed: opencodeCommands.length >= 1,
+    detail: opencodeCommands.length === 0
+      ? 'No OpenCode commands found'
+      : `${opencodeCommands.length} command${opencodeCommands.length === 1 ? '' : 's'} found`,
+  });
+
+  // 2g. OpenCode agents exist
+  const opencodeAgents = countFiles(join(dir, '.opencode', 'agents'), /\.md$/);
+  checks.push({
+    id: 'opencode_agents_exist',
+    name: 'OpenCode agents configured',
+    category: 'existence',
+    maxPoints: 2,
+    earnedPoints: opencodeAgents.length >= 1 ? 2 : 0,
+    passed: opencodeAgents.length >= 1,
+    detail: opencodeAgents.length === 0
+      ? 'No OpenCode agents found'
+      : `${opencodeAgents.length} agent${opencodeAgents.length === 1 ? '' : 's'} found`,
   });
 
   // 3. Skills exist (.claude/skills/ or .agents/skills/)
@@ -215,7 +302,8 @@ export function checkExistence(dir: string): Check[] {
   // 6. Cross-platform parity
   const hasClaudeConfigs = claudeMdExists || skillCount > 0;
   const hasCursorConfigs = cursorRulesExist || mdcCount > 0;
-  const hasParity = hasClaudeConfigs && hasCursorConfigs;
+  const hasOpenCodeConfigs = opencodeJsonExists || opencodeSkillsCount > 0;
+  const hasParity = (hasClaudeConfigs || hasOpenCodeConfigs) && hasCursorConfigs;
   checks.push({
     id: 'cross_platform_parity',
     name: 'Cross-platform parity',
@@ -224,17 +312,17 @@ export function checkExistence(dir: string): Check[] {
     earnedPoints: hasParity ? POINTS_CROSS_PLATFORM_PARITY : 0,
     passed: hasParity,
     detail: hasParity
-      ? 'Both Claude Code and Cursor configured'
+      ? 'Claude/Cursor configured'
       : hasClaudeConfigs
-        ? 'Only Claude Code — no Cursor configs'
-        : hasCursorConfigs
-          ? 'Only Cursor — no Claude Code configs'
+        ? 'Claude-only — no Cursor configs'
+        : hasOpenCodeConfigs
+          ? 'OpenCode-only — no Cursor configs'
           : 'Neither platform configured',
-    suggestion: hasParity ? undefined : 'Add configs for both platforms so all teammates get context',
+    suggestion: hasParity ? undefined : 'Add configs for both Claude/Cursor and OpenCode to support all team members',
     fix: hasParity ? undefined : {
       action: 'add_platform',
-      data: { hasClaude: hasClaudeConfigs, hasCursor: hasCursorConfigs },
-      instruction: hasClaudeConfigs
+      data: { hasClaude: hasClaudeConfigs, hasCursor: hasCursorConfigs, hasOpenCode: hasOpenCodeConfigs },
+      instruction: hasClaudeConfigs || hasOpenCodeConfigs
         ? 'Add Cursor rules (.cursor/rules/) for cross-platform support.'
         : 'Add CLAUDE.md for cross-platform support.',
     },

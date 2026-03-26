@@ -3,6 +3,7 @@ import { writeClaudeConfig } from './claude/index.js';
 import { writeCursorConfig } from './cursor/index.js';
 import { writeCodexConfig } from './codex/index.js';
 import { writeGithubCopilotConfig } from './github-copilot/index.js';
+import { writeOpenCodeConfig } from './opencode/index.js';
 import { createBackup, restoreBackup } from './backup.js';
 import { ensureBuiltinSkills } from '../lib/builtin-skills.js';
 import { MANIFEST_FILE } from '../constants.js';
@@ -15,12 +16,13 @@ import {
 } from './manifest.js';
 
 export interface AgentSetup {
-  targetAgent: ('claude' | 'cursor' | 'codex' | 'github-copilot')[];
+  targetAgent: ('claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode')[];
   deletions?: Array<{ filePath: string; reason: string }>;
   claude?: Parameters<typeof writeClaudeConfig>[0];
   cursor?: Parameters<typeof writeCursorConfig>[0];
   codex?: Parameters<typeof writeCodexConfig>[0];
   copilot?: Parameters<typeof writeGithubCopilotConfig>[0];
+  opencode?: Parameters<typeof writeOpenCodeConfig>[0];
 }
 
 export function writeSetup(setup: AgentSetup): { written: string[]; deleted: string[]; backupDir?: string } {
@@ -51,6 +53,10 @@ export function writeSetup(setup: AgentSetup): { written: string[]; deleted: str
 
   if (setup.targetAgent.includes('github-copilot') && setup.copilot) {
     written.push(...writeGithubCopilotConfig(setup.copilot));
+  }
+
+  if (setup.targetAgent.includes('opencode') && setup.opencode) {
+    written.push(...writeOpenCodeConfig(setup.opencode));
   }
 
   const deleted: string[] = [];
@@ -147,6 +153,26 @@ export function getFilesToWrite(setup: AgentSetup): string[] {
     if (setup.copilot.instructions) files.push('.github/copilot-instructions.md');
     if (setup.copilot.instructionFiles) {
       for (const f of setup.copilot.instructionFiles) files.push(`.github/instructions/${f.filename}`);
+    }
+  }
+
+  if (setup.targetAgent.includes('opencode') && setup.opencode) {
+    files.push('opencode.json');
+    if (setup.opencode.mcpServers) files.push('opencode.json');
+    if (setup.opencode.skills) {
+      for (const s of setup.opencode.skills) {
+        files.push(`.opencode/skills/${s.name}/SKILL.md`);
+      }
+    }
+    if (setup.opencode.commands) {
+      for (const c of setup.opencode.commands) {
+        files.push(`.opencode/commands/${c.name}.md`);
+      }
+    }
+    if (setup.opencode.agents) {
+      for (const a of setup.opencode.agents) {
+        files.push(`.opencode/agents/${a.name}.md`);
+      }
     }
   }
 
