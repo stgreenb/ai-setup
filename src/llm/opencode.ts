@@ -38,15 +38,16 @@ export class OpenCodeProvider implements LLMProvider {
 
   private runOpenCode(prompt: string, model: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const args = ['run', '--format', 'json', '--model', model, '--'];
+      const args = ['run', '--format', 'json', '--model', model];
       const opts: SpawnSyncOptions = {
         timeout: this.timeoutMs,
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024, // 10MB
+        input: prompt,
         ...(IS_WINDOWS && { shell: true }),
       };
 
-      const result = spawnSync(OPENCODE_BIN, [...args, prompt], opts);
+      const result = spawnSync(OPENCODE_BIN, args, opts);
       
       if (result.error) {
         reject(result.error);
@@ -87,10 +88,14 @@ export class OpenCodeProvider implements LLMProvider {
 
   private runOpenCodeStream(prompt: string, model: string, callbacks: LLMStreamCallbacks): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = spawn(OPENCODE_BIN, ['run', '--format', 'json', '--model', model, '--', prompt], {
+      const child = spawn(OPENCODE_BIN, ['run', '--format', 'json', '--model', model], {
         timeout: this.timeoutMs,
         ...(IS_WINDOWS && { shell: true }),
       });
+
+      // Write prompt to stdin
+      child.stdin?.write(prompt);
+      child.stdin?.end();
 
       let buffer = '';
 
