@@ -32,7 +32,12 @@ export class OpenCodeProvider implements LLMProvider {
 
   constructor(config: LLMConfig) {
     // Priority: config param > opencode.json > fallback
-    this.defaultModel = config.model || getOpenCodeModelFromConfig() || 'opencode/minimax-m2.5-free';
+    // If config has a router-style model (like "router/auto-fastest"), don't pass --model
+    // and let OpenCode use its configured default
+    const configModel = config.model || getOpenCodeModelFromConfig();
+    this.defaultModel = configModel && !configModel.startsWith('router/') 
+      ? configModel 
+      : ''; // Empty string = use OpenCode's default
     const envTimeout = process.env.CALIBER_OPENCODE_TIMEOUT_MS;
     this.timeoutMs = envTimeout ? parseInt(envTimeout, 10) : DEFAULT_TIMEOUT_MS;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1000) {
@@ -60,7 +65,7 @@ export class OpenCodeProvider implements LLMProvider {
 
   private runOpenCode(prompt: string, model: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const args = ['run', '--format', 'json', '--model', model];
+      const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
       const opts: SpawnSyncOptions = {
         timeout: this.timeoutMs,
         encoding: 'utf-8',
@@ -110,7 +115,8 @@ export class OpenCodeProvider implements LLMProvider {
 
   private runOpenCodeStream(prompt: string, model: string, callbacks: LLMStreamCallbacks): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = spawn(OPENCODE_BIN, ['run', '--format', 'json', '--model', model], {
+      const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
+      const child = spawn(OPENCODE_BIN, args, {
         timeout: this.timeoutMs,
         ...(IS_WINDOWS && { shell: true }),
       });
