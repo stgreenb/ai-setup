@@ -11,8 +11,14 @@ This is a fork of [caliber-ai-org/ai-setup](https://github.com/caliber-ai-org/ai
 ## Getting Started
 
 ```bash
-npx caliber score --agent opencode
-npx caliber init --agent opencode
+# Option 1: Direct from this fork (recommended for testing)
+npx git+https://github.com/stgreenb/ai-setup.git score --agent opencode
+npx git+https://github.com/stgreenb/ai-setup.git init --agent opencode
+
+# Option 2: Clone and use locally
+git clone https://github.com/stgreenb/ai-setup.git
+cd ai-setup && npm install && npm run build
+./dist/bin.js score --agent opencode
 ```
 
 ## Full Documentation
