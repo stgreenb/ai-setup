@@ -11,8 +11,8 @@ This is a fork of [caliber-ai-org/ai-setup](https://github.com/caliber-ai-org/ai
 ## Getting Started
 
 ```bash
-npx @rely-ai/caliber score --agent opencode
-npx @rely-ai/caliber init --agent opencode
+npx caliber score --agent opencode
+npx caliber init --agent opencode
 ```
 
 ## Full Documentation
