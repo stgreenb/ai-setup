@@ -1,16 +1,38 @@
 import { spawn, execSync, type ChildProcess, spawnSync, type SpawnSyncOptions } from 'node:child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
 
 const OPENCODE_BIN = 'opencode';
 const IS_WINDOWS = process.platform === 'win32';
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
+function getOpenCodeModelFromConfig(): string | null {
+  const paths = [
+    join(process.cwd(), 'opencode.json'),
+    join(homedir(), '.config', 'opencode', 'opencode.json'),
+  ];
+  
+  for (const p of paths) {
+    try {
+      if (existsSync(p)) {
+        const content = readFileSync(p, 'utf-8');
+        const config = JSON.parse(content);
+        if (config.model) return config.model;
+      }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 export class OpenCodeProvider implements LLMProvider {
   private defaultModel: string;
   private timeoutMs: number;
 
   constructor(config: LLMConfig) {
-    this.defaultModel = config.model || 'default';
+    // Priority: config param > opencode.json > fallback
+    this.defaultModel = config.model || getOpenCodeModelFromConfig() || 'opencode/minimax-m2.5-free';
     const envTimeout = process.env.CALIBER_OPENCODE_TIMEOUT_MS;
     this.timeoutMs = envTimeout ? parseInt(envTimeout, 10) : DEFAULT_TIMEOUT_MS;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1000) {
