@@ -12,7 +12,7 @@ export const DEFAULT_MODELS: Record<ProviderType, string> = {
   openai: 'gpt-4.1',
   cursor: 'sonnet-4.6',
   'claude-cli': 'default',
-  opencode: 'default',
+  opencode: 'opencode/minimax-m2.5-free',
 };
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
