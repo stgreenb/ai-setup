@@ -6,7 +6,7 @@ import { CORE_GENERATION_PROMPT, GENERATION_SYSTEM_PROMPT, SKILL_GENERATION_PROM
 import { extractAllDeps } from '../utils/dependencies.js';
 import { formatSourcesForPrompt } from '../fingerprint/sources.js';
 
-type TargetAgent = ('claude' | 'cursor' | 'codex' | 'github-copilot')[];
+type TargetAgent = ('claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode')[];
 
 interface GenerateCallbacks {
   onStatus: (message: string) => void;

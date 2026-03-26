@@ -33,6 +33,7 @@ const KNOWN_MODELS: Record<ProviderType, string[]> = {
   ],
   cursor: [],
   'claude-cli': [],
+  opencode: [],
 };
 
 /**

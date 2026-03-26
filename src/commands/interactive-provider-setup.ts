@@ -94,8 +94,9 @@ export async function runInteractiveProviderSetup(options?: {
       break;
     }
     case 'opencode': {
-      config.model = DEFAULT_MODELS.opencode || 'default';
+      config.model = '';
       console.log(chalk.dim('  LLM calls will be routed through OpenCode CLI.'));
+      console.log(chalk.dim('  Will use OpenCode\'s default model from your opencode.jsonc config.'));
       console.log(chalk.dim('  Ensure OpenCode is installed and authenticated: ') + chalk.hex('#83D1EB')('opencode auth login'));
       break;
     }

@@ -582,7 +582,7 @@ export async function initCommand(options: InitOptions) {
     throw new Error('__exit__');
   }
 
-  if (fingerprint) ensurePermissions(fingerprint);
+  if (fingerprint && targetAgent.includes('claude')) ensurePermissions(fingerprint);
 
   const sha = getCurrentHeadSha();
   writeState({

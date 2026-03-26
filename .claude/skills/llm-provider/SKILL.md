@@ -92,3 +92,20 @@ description: Implements or modifies an LLM provider in src/llm/ by implementing 
   - Verify `call()` returns `inputTokens` and `outputTokens` as numbers (not strings).
   - If provider doesn't return token counts: use `estimateTokens(messages, model)` from `src/llm/utils.ts` to estimate before API call.
   - Verify caller invokes `trackUsage()` after `llmCall()` succeeds (check `src/ai/generate.ts` for pattern).
+
+- **OpenCode provider: "Model not found: mrx/auto-fastest"**
+  - When configuring OpenCode providers in `~/.config/opencode/opencode.jsonc`, the provider KEY must match the provider name exactly.
+  - Example correct config:
+    ```jsonc
+    {
+      "provider": {
+        "mrx": {  // KEY must be "mrx", NOT "router"
+          "npm": "@ai-sdk/openai-compatible",
+          "name": "mrx",
+          "options": { "baseURL": "...", "apiKey": "..." }
+        }
+      },
+      "model": "mrx/auto-fastest"
+    }
+    ```
+  - The provider key (`"mrx"`) must match what's used in the model (`"mrx/auto-fastest"`).

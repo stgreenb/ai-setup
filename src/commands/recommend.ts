@@ -11,7 +11,7 @@ import { trackSkillsInstalled } from '../telemetry/events.js';
 import { readState } from '../lib/state.js';
 import { resolveCaliber } from '../lib/resolve-caliber.js';
 
-type Platform = 'claude' | 'cursor' | 'codex' | 'github-copilot';
+type Platform = 'claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode';
 
 export interface SkillResult {
   name: string;

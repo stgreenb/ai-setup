@@ -5,7 +5,7 @@ export { buildSkillContent };
 
 export function collectSetupFiles(
   setup: Record<string, unknown>,
-  targetAgent?: ('claude' | 'cursor' | 'codex' | 'github-copilot')[],
+  targetAgent?: ('claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode')[],
 ): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
   const claude = setup.claude as Record<string, unknown> | undefined;

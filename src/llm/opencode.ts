@@ -1,4 +1,4 @@
-import { spawn, execSync, type ChildProcess, spawnSync, type SpawnSyncOptions } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
 
 const OPENCODE_BIN = 'opencode';
@@ -9,9 +9,8 @@ export class OpenCodeProvider implements LLMProvider {
   private defaultModel: string;
   private timeoutMs: number;
 
-  constructor(_config: LLMConfig) {
-    // Always pass empty model - let OpenCode use its configured default from opencode.json
-    this.defaultModel = '';
+  constructor(config: LLMConfig) {
+    this.defaultModel = config.model || '';
     
     const envTimeout = process.env.CALIBER_OPENCODE_TIMEOUT_MS;
     this.timeoutMs = envTimeout ? parseInt(envTimeout, 10) : DEFAULT_TIMEOUT_MS;
@@ -21,143 +20,171 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   async call(options: LLMCallOptions): Promise<string> {
-    const model = options.model || this.defaultModel;
     const fullPrompt = options.system 
       ? `${options.system}\n\n${options.prompt}`
       : options.prompt;
     
-    return this.runOpenCode(fullPrompt, model);
+    return this.runCommand(fullPrompt, undefined);
   }
 
   async stream(options: LLMStreamOptions, callbacks: LLMStreamCallbacks): Promise<void> {
-    const model = options.model || this.defaultModel;
     const fullPrompt = options.system 
       ? `${options.system}\n\n${options.prompt}`
       : options.prompt;
     
-    return this.runOpenCodeStream(fullPrompt, model, callbacks);
+    return this.runCommandStream(fullPrompt, undefined, callbacks);
   }
 
-  private runOpenCode(prompt: string, model: string): Promise<string> {
+  private async runCommand(prompt: string, model?: string): Promise<string> {
+    const args = ['run', '--format', 'json'];
+    const modelToUse = model && model !== 'default' ? model : undefined;
+    if (modelToUse) args.push('--model', modelToUse);
+    
     return new Promise((resolve, reject) => {
-      const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
-      const opts: SpawnSyncOptions = {
-        timeout: this.timeoutMs,
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        input: prompt,
-        ...(IS_WINDOWS && { shell: true }),
-      };
-
-      const result = spawnSync(OPENCODE_BIN, args, opts);
+      const child = this.spawnOpenCode(args);
+      child.stdin!.end(prompt);
       
-      if (result.error) {
-        reject(result.error);
-        return;
-      }
-
-      if (result.status !== 0) {
-        const stderr = typeof result.stderr === 'string' ? result.stderr : result.stderr?.toString() || '';
-        reject(new Error(`opencode exited with code ${result.status}: ${stderr}`));
-        return;
-      }
-
-      // Parse JSON events from output
-      const stdout = result.stdout;
-      const output = typeof stdout === 'string' ? stdout : stdout?.toString() || '';
-      const events = output.split('\n').filter((line: string) => line.trim());
-      let finalContent = '';
-
-      for (const eventStr of events) {
-        try {
-          const event = JSON.parse(eventStr);
-          if (event.type === 'result' && event.message?.content) {
-            const content = event.message.content;
-            if (Array.isArray(content)) {
-              finalContent = content.map((c: { text?: string }) => c.text || '').join('');
-            } else if (typeof content === 'string') {
-              finalContent = content;
-            }
-          }
-        } catch {
-          // Skip non-JSON lines
+      const chunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      
+      child.stdout!.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      
+      child.stderr!.on('data', (chunk: Buffer) => {
+        stderrChunks.push(chunk);
+      });
+      
+      const timer = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error(`OpenCode timed out after ${this.timeoutMs / 1000}s`));
+      }, this.timeoutMs);
+      
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        
+        if (code !== 0) {
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8');
+          reject(new Error(`OpenCode exited with code ${code}: ${stderr.slice(0, 500)}`));
+          return;
         }
-      }
-
-      resolve(finalContent || output);
+        
+        const output = Buffer.concat(chunks).toString('utf-8');
+        const text = this.parseJsonOutput(output);
+        resolve(text);
+      });
     });
   }
 
-  private runOpenCodeStream(prompt: string, model: string, callbacks: LLMStreamCallbacks): Promise<void> {
+  private async runCommandStream(prompt: string, model: string | undefined, callbacks: LLMStreamCallbacks): Promise<void> {
+    const args = ['run', '--format', 'json'];
+    const modelToUse = model && model !== 'default' ? model : undefined;
+    if (modelToUse) args.push('--model', modelToUse);
+    
     return new Promise((resolve, reject) => {
-      const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
+      const child = this.spawnOpenCode(args);
+      child.stdin!.end(prompt);
       
-      const child = spawn(OPENCODE_BIN, args, {
-        timeout: this.timeoutMs,
-        ...(IS_WINDOWS && { shell: true }),
-      });
-
-      child.on('error', (err) => {
-        callbacks.onError(err);
-        reject(err);
-      });
-
-      child.on('spawn', () => {
-        child.stdin?.write(prompt);
-        child.stdin?.end();
-      });
-
-      let buffer = '';
-
-      child.stdout?.on('data', (chunk) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
+      let settled = false;
+      const stderrChunks: Buffer[] = [];
+      
+      child.stdout!.on('data', (chunk: Buffer) => {
+        if (settled) return;
+        
+        const lines = chunk.toString('utf-8').split('\n');
         for (const line of lines) {
           if (!line.trim()) continue;
+          
           try {
             const event = JSON.parse(line);
-            if (event.type === 'assistant' && event.message?.content) {
-              const content = event.message.content;
-              if (Array.isArray(content)) {
-                callbacks.onText(content.map((c: { text?: string }) => c.text || '').join(''));
-              } else if (typeof content === 'string') {
-                callbacks.onText(content);
-              }
-            } else if (event.type === 'result') {
-              callbacks.onEnd({ 
-                stopReason: event.is_error ? 'error' : 'end_turn',
-                usage: event.usage,
-              });
+            if (event.type === 'text' && event.part?.text) {
+              callbacks.onText(event.part.text);
+            } else if (event.type === 'error') {
+              settled = true;
+              callbacks.onError(new Error(event.error?.data?.message || 'Unknown error'));
+              child.kill();
+              return;
             }
           } catch {
-            // Not JSON, treat as text
-            callbacks.onText(line);
+            // Not JSON, ignore
           }
         }
       });
-
-      child.stderr?.on('data', (data) => {
-        // Log stderr but don't treat as error
+      
+      child.stderr!.on('data', (chunk: Buffer) => {
+        stderrChunks.push(chunk);
       });
-
+      
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          callbacks.onError(new Error(`OpenCode timed out after ${this.timeoutMs / 1000}s`));
+          child.kill('SIGTERM');
+        }
+      }, this.timeoutMs);
+      
       child.on('error', (err) => {
-        callbacks.onError(err);
-        reject(err);
+        clearTimeout(timer);
+        if (!settled) {
+          settled = true;
+          callbacks.onError(err);
+        }
       });
-
+      
       child.on('close', (code) => {
-        if (code !== 0 && buffer.length === 0) {
-          callbacks.onError(new Error(`opencode exited with code ${code}`));
+        clearTimeout(timer);
+        if (settled) return;
+        
+        if (code !== 0 && code !== null) {
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8');
+          callbacks.onError(new Error(`OpenCode exited with code ${code}: ${stderr.slice(0, 500)}`));
+        } else {
+          callbacks.onEnd({ stopReason: 'end_turn' });
         }
         resolve();
       });
     });
   }
 
-  async dispose(): Promise<void> {
-    // No persistent resources to clean up with CLI approach
+  private spawnOpenCode(args: string[]): ChildProcess {
+    if (IS_WINDOWS) {
+      return spawn([OPENCODE_BIN, ...args].join(' '), {
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'] as const,
+        env: process.env,
+        shell: true,
+      });
+    }
+    return spawn(OPENCODE_BIN, args, {
+      cwd: process.cwd(),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env,
+    });
+  }
+
+  private parseJsonOutput(output: string): string {
+    const lines = output.split('\n');
+    const textParts: string[] = [];
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      
+      try {
+        const event = JSON.parse(line);
+        if (event.type === 'text' && event.part?.text) {
+          textParts.push(event.part.text);
+        }
+      } catch {
+        // Not JSON, skip
+      }
+    }
+    
+    return textParts.join('');
   }
 }
 
