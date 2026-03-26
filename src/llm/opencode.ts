@@ -1,38 +1,16 @@
 import { spawn, execSync, type ChildProcess, spawnSync, type SpawnSyncOptions } from 'node:child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
 import type { LLMProvider, LLMCallOptions, LLMStreamOptions, LLMStreamCallbacks, LLMConfig } from './types.js';
 
 const OPENCODE_BIN = 'opencode';
 const IS_WINDOWS = process.platform === 'win32';
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
-function getOpenCodeModelFromConfig(): string | null {
-  const paths = [
-    join(process.cwd(), 'opencode.json'),
-    join(homedir(), '.config', 'opencode', 'opencode.json'),
-  ];
-  
-  for (const p of paths) {
-    try {
-      if (existsSync(p)) {
-        const content = readFileSync(p, 'utf-8');
-        const config = JSON.parse(content);
-        if (config.model) return config.model;
-      }
-    } catch { /* ignore */ }
-  }
-  return null;
-}
-
 export class OpenCodeProvider implements LLMProvider {
   private defaultModel: string;
   private timeoutMs: number;
 
-  constructor(config: LLMConfig) {
-    // Skip reading model from config file - let OpenCode use its own default
-    // The config file may have router-style models that get mangled
+  constructor(_config: LLMConfig) {
+    // Always pass empty model - let OpenCode use its configured default from opencode.json
     this.defaultModel = '';
     
     const envTimeout = process.env.CALIBER_OPENCODE_TIMEOUT_MS;
@@ -113,7 +91,6 @@ export class OpenCodeProvider implements LLMProvider {
   private runOpenCodeStream(prompt: string, model: string, callbacks: LLMStreamCallbacks): Promise<void> {
     return new Promise((resolve, reject) => {
       const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
-      console.error('[OpenCode] Starting with args:', args);
       
       const child = spawn(OPENCODE_BIN, args, {
         timeout: this.timeoutMs,
@@ -121,13 +98,11 @@ export class OpenCodeProvider implements LLMProvider {
       });
 
       child.on('error', (err) => {
-        console.error('[OpenCode] Spawn error:', err.message);
         callbacks.onError(err);
         reject(err);
       });
 
       child.on('spawn', () => {
-        console.error('[OpenCode] Process spawned, writing prompt...');
         child.stdin?.write(prompt);
         child.stdin?.end();
       });
@@ -135,7 +110,6 @@ export class OpenCodeProvider implements LLMProvider {
       let buffer = '';
 
       child.stdout?.on('data', (chunk) => {
-        console.error('[OpenCode] stdout:', chunk.toString().substring(0, 200));
         buffer += chunk.toString();
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
