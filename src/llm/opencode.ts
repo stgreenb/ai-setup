@@ -31,13 +31,10 @@ export class OpenCodeProvider implements LLMProvider {
   private timeoutMs: number;
 
   constructor(config: LLMConfig) {
-    // Priority: config param > opencode.json > fallback
-    // If config has a router-style model (like "router/auto-fastest"), don't pass --model
-    // and let OpenCode use its configured default
-    const configModel = config.model || getOpenCodeModelFromConfig();
-    this.defaultModel = configModel && !configModel.startsWith('router/') 
-      ? configModel 
-      : ''; // Empty string = use OpenCode's default
+    // Skip reading model from config file - let OpenCode use its own default
+    // The config file may have router-style models that get mangled
+    this.defaultModel = '';
+    
     const envTimeout = process.env.CALIBER_OPENCODE_TIMEOUT_MS;
     this.timeoutMs = envTimeout ? parseInt(envTimeout, 10) : DEFAULT_TIMEOUT_MS;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1000) {
@@ -116,18 +113,29 @@ export class OpenCodeProvider implements LLMProvider {
   private runOpenCodeStream(prompt: string, model: string, callbacks: LLMStreamCallbacks): Promise<void> {
     return new Promise((resolve, reject) => {
       const args = model ? ['run', '--format', 'json', '--model', model] : ['run', '--format', 'json'];
+      console.error('[OpenCode] Starting with args:', args);
+      
       const child = spawn(OPENCODE_BIN, args, {
         timeout: this.timeoutMs,
         ...(IS_WINDOWS && { shell: true }),
       });
 
-      // Write prompt to stdin
-      child.stdin?.write(prompt);
-      child.stdin?.end();
+      child.on('error', (err) => {
+        console.error('[OpenCode] Spawn error:', err.message);
+        callbacks.onError(err);
+        reject(err);
+      });
+
+      child.on('spawn', () => {
+        console.error('[OpenCode] Process spawned, writing prompt...');
+        child.stdin?.write(prompt);
+        child.stdin?.end();
+      });
 
       let buffer = '';
 
       child.stdout?.on('data', (chunk) => {
+        console.error('[OpenCode] stdout:', chunk.toString().substring(0, 200));
         buffer += chunk.toString();
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
