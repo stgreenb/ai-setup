@@ -188,22 +188,36 @@ export class OpenCodeProvider implements LLMProvider {
       const trimmed = line.trim();
       if (!trimmed) continue;
       
-      // Skip markdown code fences
+      // Skip markdown code fences and empty markers
       if (trimmed.startsWith('```') || trimmed === '```') continue;
+      if (trimmed === '> build · auto-fastest') continue;
+      if (trimmed.startsWith('> ')) continue;
       
       // Try to parse as JSON event
       try {
         const event = JSON.parse(trimmed);
         if (event.type === 'text' && event.part?.text) {
           textParts.push(event.part.text);
+        } else if (event.type === 'step_finish' || event.type === 'step_start') {
+          continue;
         }
       } catch {
-        // Not JSON - treat as plain text
-        textParts.push(trimmed);
+        // Not JSON - treat as plain text if it looks like content
+        if (trimmed.length > 5 && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          textParts.push(trimmed);
+        }
       }
     }
     
-    return textParts.join('');
+    const result = textParts.join('');
+    
+    // Try to find JSON object in the result
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return jsonMatch[0];
+    }
+    
+    return result;
   }
 }
 
