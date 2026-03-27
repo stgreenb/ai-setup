@@ -36,7 +36,7 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private async runCommand(prompt: string, model?: string): Promise<string> {
-    const args = ['run', '--format', 'default'];
+    const args = ['run', '--format', 'json'];
     const modelToUse = model && model !== 'default' ? model : undefined;
     if (modelToUse) args.push('--model', modelToUse);
     
@@ -168,16 +168,29 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private parseJsonOutput(output: string): string {
-    const text = output.trim();
+    const textParts: string[] = [];
+    const lines = output.split('\n');
     
-    if (!text) return '';
-    
-    try {
-      JSON.parse(text);
-      return text;
-    } catch {
-      return output;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Skip markdown code fences
+      if (trimmed.startsWith('```') || trimmed === '```') continue;
+      
+      // Try to parse as JSON event
+      try {
+        const event = JSON.parse(trimmed);
+        if (event.type === 'text' && event.part?.text) {
+          textParts.push(event.part.text);
+        }
+      } catch {
+        // Not JSON - treat as plain text
+        textParts.push(trimmed);
+      }
     }
+    
+    return textParts.join('');
   }
 }
 
