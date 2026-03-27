@@ -68,14 +68,25 @@ export class OpenCodeProvider implements LLMProvider {
       child.on('close', (code) => {
         clearTimeout(timer);
         
+        const stderr = Buffer.concat(stderrChunks).toString('utf-8');
+        const output = Buffer.concat(chunks).toString('utf-8');
+        
         if (code !== 0) {
-          const stderr = Buffer.concat(stderrChunks).toString('utf-8');
           reject(new Error(`OpenCode exited with code ${code}: ${stderr.slice(0, 500)}`));
           return;
         }
         
-        const output = Buffer.concat(chunks).toString('utf-8');
+        // Log stderr for debugging
+        if (stderr.trim()) {
+          console.error('[OpenCode stderr]:', stderr.slice(0, 500));
+        }
+        
         const text = this.parseJsonOutput(output);
+        if (!text.trim()) {
+          reject(new Error(`OpenCode returned empty response. stdout: ${output.slice(0, 500)}, stderr: ${stderr.slice(0, 500)}`));
+          return;
+        }
+        
         resolve(text);
       });
     });
@@ -152,18 +163,20 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private spawnOpenCode(args: string[]): ChildProcess {
+    const env = { ...process.env, OPENCODE_DISABLE_AUTOCOMPACT: 'true' };
+    
     if (IS_WINDOWS) {
       return spawn([OPENCODE_BIN, ...args].join(' '), {
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'] as const,
-        env: process.env,
+        env,
         shell: true,
       });
     }
     return spawn(OPENCODE_BIN, args, {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: process.env,
+      env,
     });
   }
 

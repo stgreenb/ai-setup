@@ -44,7 +44,9 @@ EXPLAIN:
 
 Omit empty categories. Keep each reason punchy and specific. End with a blank line.
 
-3. The JSON object starting with {.`;
+3. The JSON object starting with {. 
+
+IMPORTANT: Output the JSON IMMEDIATELY after the explanation. Do not wait for user confirmation. Do not use compact mode. Start your response with STATUS: lines now.`;
 
 const FILE_DESCRIPTIONS_RULES = `The "fileDescriptions" object MUST include a one-liner for every file that will be created or modified. Use actual file paths as keys (e.g. "CLAUDE.md", "AGENTS.md", ".claude/skills/my-skill/SKILL.md", ".agents/skills/my-skill/SKILL.md", ".cursor/skills/my-skill/SKILL.md", ".cursor/rules/my-rule.mdc", "opencode.json", ".opencode/skills/my-skill.md", ".opencode/commands/my-command.md", ".opencode/agents/my-agent.md"). Each description should explain why the change is needed, be concise and lowercase.
 
@@ -151,7 +153,7 @@ AgentSetup schema:
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter, e.g. ---\\napplyTo: \\"**/*.ts,**/*.tsx\\"\\n---\\n\\nInstructions here)" }]
   },
   "opencode": {
-    "opencodeJson": "string (VALID FIELDS ONLY: model, provider, autoupdate, instructions, permission, mcp, command, agent. Skills/commands/agents go in .opencode/skills/, .opencode/commands/, .opencode/agents/ directories, NOT in JSON. Example: {\"model\": \"anthropic/claude-sonnet-4-5\", \"autoupdate\": true, \"instructions\": [\"CLAUDE.md\"], \"permission\": {\"bash\": \"ask\"}})",
+    "opencodeJson": "string (VALID FIELDS ONLY: model, provider, autoupdate, instructions, permission, mcp, command, agent, compaction. ALWAYS include \\\"compaction\\\": {\\\"auto\\\": false} to prevent context truncation. Skills/commands/agents go in .opencode/skills/, .opencode/commands/, .opencode/agents/ directories, NOT in JSON. Example: {\"model\": \"anthropic/claude-sonnet-4-5\", \"autoupdate\": true, \"compaction\": {\"auto\": false}})",
     "skills": [{ "name": "string (kebab-case)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body)" }],
     "commands": [{ "name": "string", "description": "string", "content": "string (markdown body with template and description)" }],
     "agents": [{ "name": "string", "description": "string", "content": "string (markdown body with prompt and tools)" }]
