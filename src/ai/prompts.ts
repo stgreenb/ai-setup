@@ -151,7 +151,7 @@ AgentSetup schema:
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter, e.g. ---\\napplyTo: \\"**/*.ts,**/*.tsx\\"\\n---\\n\\nInstructions here)" }]
   },
   "opencode": {
-    "opencodeJson": "string (JSON content for opencode.json — omit 'model' field to use OpenCode's default from opencode.jsonc, provider, MCP servers, permissions, autoupdate)",
+    "opencodeJson": "string (VALID FIELDS ONLY: model, provider, autoupdate, instructions, permission, mcp, command, agent. Skills/commands/agents go in .opencode/skills/, .opencode/commands/, .opencode/agents/ directories, NOT in JSON. Example: {\"model\": \"anthropic/claude-sonnet-4-5\", \"autoupdate\": true, \"instructions\": [\"CLAUDE.md\"], \"permission\": {\"bash\": \"ask\"}})",
     "skills": [{ "name": "string (kebab-case)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body)" }],
     "commands": [{ "name": "string", "description": "string", "content": "string (markdown body with template and description)" }],
     "agents": [{ "name": "string", "description": "string", "content": "string (markdown body with prompt and tools)" }]
@@ -291,7 +291,7 @@ AgentSetup schema:
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter)" }]
   },
   "opencode": {
-    "opencodeJson": "string (JSON content for opencode.json — omit 'model' field to use OpenCode's default)",
+    "opencodeJson": "string (VALID FIELDS ONLY: model, provider, autoupdate, instructions, permission, mcp, command, agent. Skills/commands/agents go in .opencode/skills/, .opencode/commands/, .opencode/agents/ directories. Example: {\"model\": \"anthropic/claude-sonnet-4-5\", \"autoupdate\": true})",
     "skills": [{ "name": "string (kebab-case)", "description": "string", "content": "string (markdown body)" }],
     "commands": [{ "name": "string", "description": "string", "content": "string" }],
     "agents": [{ "name": "string", "description": "string", "content": "string" }]

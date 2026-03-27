@@ -36,7 +36,7 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private async runCommand(prompt: string, model?: string): Promise<string> {
-    const args = ['run', '--format', 'json'];
+    const args = ['run', '--format', 'default'];
     const modelToUse = model && model !== 'default' ? model : undefined;
     if (modelToUse) args.push('--model', modelToUse);
     
@@ -82,7 +82,7 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private async runCommandStream(prompt: string, model: string | undefined, callbacks: LLMStreamCallbacks): Promise<void> {
-    const args = ['run', '--format', 'json'];
+    const args = ['run', '--format', 'default'];
     const modelToUse = model && model !== 'default' ? model : undefined;
     if (modelToUse) args.push('--model', modelToUse);
     
@@ -168,23 +168,16 @@ export class OpenCodeProvider implements LLMProvider {
   }
 
   private parseJsonOutput(output: string): string {
-    const lines = output.split('\n');
-    const textParts: string[] = [];
+    const text = output.trim();
     
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      
-      try {
-        const event = JSON.parse(line);
-        if (event.type === 'text' && event.part?.text) {
-          textParts.push(event.part.text);
-        }
-      } catch {
-        // Not JSON, skip
-      }
+    if (!text) return '';
+    
+    try {
+      JSON.parse(text);
+      return text;
+    } catch {
+      return output;
     }
-    
-    return textParts.join('');
   }
 }
 
