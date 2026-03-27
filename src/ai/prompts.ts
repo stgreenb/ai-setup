@@ -153,7 +153,7 @@ AgentSetup schema:
     "instructionFiles": [{ "filename": "string.instructions.md", "content": "string (with applyTo YAML frontmatter, e.g. ---\\napplyTo: \\"**/*.ts,**/*.tsx\\"\\n---\\n\\nInstructions here)" }]
   },
   "opencode": {
-    "opencodeJson": "string (VALID FIELDS ONLY: model, provider, autoupdate, instructions, permission, mcp, command, agent, compaction. ALWAYS include \\\"compaction\\\": {\\\"auto\\\": false} to prevent context truncation. Skills/commands/agents go in .opencode/skills/, .opencode/commands/, .opencode/agents/ directories, NOT in JSON. Example: {\"model\": \"anthropic/claude-sonnet-4-5\", \"autoupdate\": true, \"compaction\": {\"auto\": false}})",
+    "opencodeJson": "string (only if user explicitly requests config changes; otherwise OMIT this field entirely - do NOT output empty {}. Valid fields: model, provider, autoupdate, instructions, permission, mcp, command, agent, compaction. ALWAYS include \\\"compaction\\\": {\\\"auto\\\": false}. Skills/commands/agents in directories.)",
     "skills": [{ "name": "string (kebab-case)", "description": "string (what this skill does and when to use it)", "content": "string (markdown body)" }],
     "commands": [{ "name": "string", "description": "string", "content": "string (markdown body with template and description)" }],
     "agents": [{ "name": "string", "description": "string", "content": "string (markdown body with prompt and tools)" }]
