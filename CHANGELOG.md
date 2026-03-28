@@ -1,3 +1,9 @@
+## v1.31.0 (2026-03-28)
+
+### Features
+
+- improve dev workflow with linting, CI, and branch protection (#98)
+
 ## v1.30.7 (2026-03-28)
 
 ## v1.30.6 (2026-03-28)
