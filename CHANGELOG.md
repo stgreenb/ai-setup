@@ -1,3 +1,13 @@
+## v1.33.3 (2026-03-29)
+
+### Bug Fixes
+
+- use plain stdout in session start hook for better visibility
+
+### Other
+
+- debug: add logging to session start hook
+
 ## v1.33.1 (2026-03-29)
 
 ### Bug Fixes
