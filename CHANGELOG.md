@@ -1,3 +1,13 @@
+## v1.33.0 (2026-03-29)
+
+### Features
+
+- add session start hook to nudge new team members to set up Caliber
+
+### Bug Fixes
+
+- restore terminal state on exit (Ghostty/Kitty) (#101)
+
 ## v1.32.0 (2026-03-29)
 
 ### Features
