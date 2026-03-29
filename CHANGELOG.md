@@ -1,3 +1,9 @@
+## v1.33.1 (2026-03-29)
+
+### Bug Fixes
+
+- make session start hook more assertive so agent acts on it
+
 ## v1.33.0 (2026-03-29)
 
 ### Features
