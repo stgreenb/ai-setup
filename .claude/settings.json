@@ -58,14 +58,14 @@
         ]
       }
     ],
-    "SessionStart": [
+    "Stop": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/caliber-session-start.sh",
-            "description": "Caliber: check sync setup on session start"
+            "command": ".claude/hooks/caliber-check-sync.sh",
+            "description": "Caliber: offer setup if not configured"
           }
         ]
       }
