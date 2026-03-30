@@ -70,6 +70,7 @@ interface InitOptions {
   showTokens?: boolean;
   autoApprove?: boolean;
   verbose?: boolean;
+  thorough?: boolean;
 }
 
 function log(verbose: boolean | undefined, ...args: unknown[]): void {
@@ -639,9 +640,15 @@ export async function initCommand(options: InitOptions) {
         content: summarizeSetup('Initial generation', generatedSetup),
       });
       try {
-        const refined = await scoreAndRefine(generatedSetup, process.cwd(), sessionHistory, {
-          onStatus: (msg) => display.update(TASK_SCORE_REFINE, 'running', msg),
-        });
+        const refined = await scoreAndRefine(
+          generatedSetup,
+          process.cwd(),
+          sessionHistory,
+          {
+            onStatus: (msg) => display.update(TASK_SCORE_REFINE, 'running', msg),
+          },
+          { thorough: options.thorough },
+        );
         if (refined !== generatedSetup) {
           display.update(TASK_SCORE_REFINE, 'done', 'Refined');
           generatedSetup = refined;

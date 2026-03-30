@@ -161,7 +161,6 @@ export function appendManagedBlocks(content: string, platform: ConfigPlatform = 
 
 // ── Cursor sync rule ─────────────────────────────────────────────────
 
-
 const CURSOR_SYNC_FILENAME = 'caliber-sync.mdc';
 
 function getCursorSyncContent(): string {

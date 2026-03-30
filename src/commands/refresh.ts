@@ -69,7 +69,8 @@ function detectSyncedAgents(writtenFiles: string[]): string[] {
   const joined = writtenFiles.join(' ');
   if (joined.includes('CLAUDE.md') || joined.includes('.claude/')) agents.push('Claude Code');
   if (joined.includes('.cursor/') || joined.includes('.cursorrules')) agents.push('Cursor');
-  if (joined.includes('copilot-instructions') || joined.includes('.github/instructions/')) agents.push('Copilot');
+  if (joined.includes('copilot-instructions') || joined.includes('.github/instructions/'))
+    agents.push('Copilot');
   if (joined.includes('AGENTS.md') || joined.includes('.agents/')) agents.push('Codex');
   return agents;
 }
@@ -271,7 +272,7 @@ async function refreshSingleRepo(
   spinner?.succeed(`${prefix}Updated ${written.length} doc${written.length === 1 ? '' : 's'}`);
 
   const fileChangesMap = new Map(
-    (response.fileChanges || []).map(fc => [fc.file, fc.description])
+    (response.fileChanges || []).map((fc) => [fc.file, fc.description]),
   );
 
   for (const file of written) {

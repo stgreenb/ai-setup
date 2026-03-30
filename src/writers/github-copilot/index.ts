@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { appendPreCommitBlock, appendLearningsBlock, appendSyncBlock } from '../pre-commit-block.js';
+import {
+  appendPreCommitBlock,
+  appendLearningsBlock,
+  appendSyncBlock,
+} from '../pre-commit-block.js';
 
 interface CopilotConfig {
   instructions: string;

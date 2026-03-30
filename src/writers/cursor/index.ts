@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { getCursorPreCommitRule, getCursorLearningsRule, getCursorSyncRule } from '../pre-commit-block.js';
+import {
+  getCursorPreCommitRule,
+  getCursorLearningsRule,
+  getCursorSyncRule,
+} from '../pre-commit-block.js';
 
 interface CursorConfig {
   cursorrules?: string;
