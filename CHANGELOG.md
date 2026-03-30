@@ -1,3 +1,9 @@
+## v1.38.0 (2026-03-30)
+
+### Features
+
+- monorepo-aware refresh (#109)
+
 ## v1.37.1 (2026-03-30)
 
 ### Bug Fixes
