@@ -240,7 +240,9 @@ export async function initCommand(options: InitOptions) {
   }
   const skillsWritten = ensureBuiltinSkills();
   if (skillsWritten.length > 0) {
-    console.log(`  ${chalk.green('✓')} Agent skills installed — /setup-caliber, /find-skills, /save-learning`);
+    console.log(
+      `  ${chalk.green('✓')} Agent skills installed — /setup-caliber, /find-skills, /save-learning`,
+    );
   } else {
     console.log(`  ${chalk.green('✓')} Agent skills — already installed`);
   }
@@ -259,12 +261,15 @@ export async function initCommand(options: InitOptions) {
   console.log(chalk.dim('  (Claude Code or Cursor) to get set up automatically.\n'));
 
   // Compute & show initial score
-  let baselineScore = computeLocalScore(process.cwd(), targetAgent);
+  const baselineScore = computeLocalScore(process.cwd(), targetAgent);
   console.log(chalk.dim('  Current config score:'));
   displayScoreSummary(baselineScore);
   if (options.verbose) {
     for (const c of baselineScore.checks) {
-      log(options.verbose, `  ${c.passed ? '✓' : '✗'} ${c.name}: ${c.earnedPoints}/${c.maxPoints}${c.suggestion ? ` — ${c.suggestion}` : ''}`);
+      log(
+        options.verbose,
+        `  ${c.passed ? '✓' : '✗'} ${c.name}: ${c.earnedPoints}/${c.maxPoints}${c.suggestion ? ` — ${c.suggestion}` : ''}`,
+      );
     }
   }
 
@@ -309,7 +314,9 @@ export async function initCommand(options: InitOptions) {
     skipGeneration = !options.force;
   } else if (hasExistingConfig && !options.force && !options.autoApprove) {
     trackInitScoreComputed(baselineScore.score, passingCount, failingCount, false);
-    console.log(chalk.dim('\n  Sync infrastructure is ready. Caliber can also audit your existing'));
+    console.log(
+      chalk.dim('\n  Sync infrastructure is ready. Caliber can also audit your existing'),
+    );
     console.log(chalk.dim('  configs and improve them using AI.\n'));
     const auditAnswer = await promptInput('  Audit and improve your existing config? (Y/n) ');
     skipGeneration = auditAnswer.toLowerCase() === 'n';
@@ -402,9 +409,6 @@ export async function initCommand(options: InitOptions) {
     );
     return;
   }
-
-  const allFailingChecks = baselineScore.checks.filter(c => !c.passed && c.maxPoints > 0);
-  const llmFixableChecks = allFailingChecks.filter(c => !NON_LLM_CHECKS.has(c.id));
 
   // ───────────────────────────────────────────────────────────────────────────
   // Step 3 — Generate
@@ -913,15 +917,25 @@ export async function initCommand(options: InitOptions) {
 
   console.log(chalk.bold.green('\n  Caliber is set up!\n'));
 
-  console.log(chalk.bold('  What\'s configured:\n'));
-  console.log(`    ${done}  Continuous sync          ${chalk.dim('pre-commit hook keeps all agent configs in sync')}`);
-  console.log(`    ${done}  Config generated         ${title(`${bin} score`)} ${chalk.dim('for full breakdown')}`);
-  console.log(`    ${done}  Agent skills             ${chalk.dim('/setup-caliber for new team members')}`);
+  console.log(chalk.bold("  What's configured:\n"));
+  console.log(
+    `    ${done}  Continuous sync          ${chalk.dim('pre-commit hook keeps all agent configs in sync')}`,
+  );
+  console.log(
+    `    ${done}  Config generated         ${title(`${bin} score`)} ${chalk.dim('for full breakdown')}`,
+  );
+  console.log(
+    `    ${done}  Agent skills             ${chalk.dim('/setup-caliber for new team members')}`,
+  );
   if (hasLearnableAgent) {
-    console.log(`    ${done}  Session learning         ${chalk.dim('agent learns from your feedback')}`);
+    console.log(
+      `    ${done}  Session learning         ${chalk.dim('agent learns from your feedback')}`,
+    );
   }
   if (communitySkillsInstalled > 0) {
-    console.log(`    ${done}  Community skills         ${chalk.dim(`${communitySkillsInstalled} skill${communitySkillsInstalled > 1 ? 's' : ''} installed for your stack`)}`);
+    console.log(
+      `    ${done}  Community skills         ${chalk.dim(`${communitySkillsInstalled} skill${communitySkillsInstalled > 1 ? 's' : ''} installed for your stack`)}`,
+    );
   }
 
   console.log(chalk.bold('\n  What happens next:\n'));
