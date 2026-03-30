@@ -1,3 +1,9 @@
+## v1.36.0 (2026-03-30)
+
+### Features
+
+- symmetric refresh across all 5 agent platforms (#105)
+
 ## v1.35.1 (2026-03-30)
 
 ## v1.35.0 (2026-03-30)
