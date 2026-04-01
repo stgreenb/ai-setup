@@ -16,3 +16,6 @@ npm-debug.log*
 
 # roro workspace
 .roro/
+
+# OpenSpec change artifacts (local development only)
+openspec/

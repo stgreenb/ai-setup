@@ -1,5 +1,6 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { checkExistence } from './checks/existence.js';
 import { checkQuality } from './checks/quality.js';
 import { checkGrounding } from './checks/grounding.js';
@@ -7,10 +8,10 @@ import { checkAccuracy } from './checks/accuracy.js';
 import { checkFreshness } from './checks/freshness.js';
 import { checkBonus } from './checks/bonus.js';
 import { checkSources } from './checks/sources.js';
-import { computeGrade, CURSOR_ONLY_CHECKS, CLAUDE_ONLY_CHECKS, CODEX_ONLY_CHECKS, COPILOT_ONLY_CHECKS, BOTH_ONLY_CHECKS, NON_CODEX_CHECKS, CLAUDE_OR_CODEX_CHECKS } from './constants.js';
+import { computeGrade, CURSOR_ONLY_CHECKS, CLAUDE_ONLY_CHECKS, CODEX_ONLY_CHECKS, COPILOT_ONLY_CHECKS, OPENCODE_ONLY_CHECKS, BOTH_ONLY_CHECKS, NON_CODEX_CHECKS, CLAUDE_OR_CODEX_CHECKS } from './constants.js';
 import { getDismissedIds } from './dismissed.js';
 
-export type TargetAgent = ('claude' | 'cursor' | 'codex' | 'opencode' | 'github-copilot')[];
+export type TargetAgent = ('claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode')[];
 export type CheckCategory = 'existence' | 'quality' | 'grounding' | 'accuracy' | 'freshness' | 'bonus';
 
 export interface CheckFix {
@@ -65,24 +66,25 @@ function filterChecksForTarget(checks: Check[], target: TargetAgent): Check[] {
   return checks.filter((c) => {
     if (CLAUDE_ONLY_CHECKS.has(c.id)) return target.includes('claude');
     if (CURSOR_ONLY_CHECKS.has(c.id)) return target.includes('cursor');
-    if (CODEX_ONLY_CHECKS.has(c.id)) return target.includes('codex') || target.includes('opencode');
+    if (CODEX_ONLY_CHECKS.has(c.id)) return target.includes('codex');
     if (COPILOT_ONLY_CHECKS.has(c.id)) return target.includes('github-copilot');
+    if (OPENCODE_ONLY_CHECKS.has(c.id)) return target.includes('opencode');
     if (BOTH_ONLY_CHECKS.has(c.id)) return target.includes('claude') && target.includes('cursor');
-    if (NON_CODEX_CHECKS.has(c.id)) return !target.includes('codex') && !target.includes('opencode');
-    if (CLAUDE_OR_CODEX_CHECKS.has(c.id)) return target.includes('claude') || target.includes('codex') || target.includes('opencode');
+    if (NON_CODEX_CHECKS.has(c.id)) return !target.includes('codex');
+    if (CLAUDE_OR_CODEX_CHECKS.has(c.id)) return target.includes('claude') || target.includes('codex');
     return true;
   });
 }
 
 /** Auto-detect target agent from existing config files on disk. */
 export function detectTargetAgent(dir: string): TargetAgent {
-  const agents: ('claude' | 'cursor' | 'codex' | 'opencode' | 'github-copilot')[] = [];
+  const agents: ('claude' | 'cursor' | 'codex' | 'github-copilot' | 'opencode')[] = [];
 
   if (existsSync(join(dir, 'CLAUDE.md')) || existsSync(join(dir, '.claude', 'skills'))) agents.push('claude');
   if (existsSync(join(dir, '.cursorrules')) || existsSync(join(dir, '.cursor', 'rules'))) agents.push('cursor');
-  if (existsSync(join(dir, '.codex')) || existsSync(join(dir, '.agents', 'skills')) || existsSync(join(dir, 'AGENTS.md'))) agents.push('codex');
-  if (existsSync(join(dir, '.opencode'))) agents.push('opencode');
-  if (existsSync(join(dir, '.github', 'copilot-instructions.md')) || existsSync(join(dir, '.github', 'instructions'))) agents.push('github-copilot');
+  if (existsSync(join(dir, '.codex')) || existsSync(join(dir, '.agents', 'skills'))) agents.push('codex');
+  if (existsSync(join(dir, '.github', 'copilot-instructions.md'))) agents.push('github-copilot');
+  if (existsSync(join(dir, 'opencode.json')) || existsSync(join(dir, '.opencode', 'skills')) || existsSync(join(homedir(), '.config', 'opencode', 'opencode.json'))) agents.push('opencode');
 
   return agents.length > 0 ? agents : ['claude'];
 }
@@ -107,7 +109,7 @@ export function computeLocalScore(dir: string, targetAgent?: TargetAgent): Score
     ...checkSources(dir),
   ];
 
-  const dismissed = getDismissedIds(dir);
+  const dismissed = getDismissedIds();
   const checks = filterChecksForTarget(allChecks, target)
     .filter(c => !dismissed.has(c.id));
   const maxPossible = checks.reduce((s, c) => s + c.maxPoints, 0);

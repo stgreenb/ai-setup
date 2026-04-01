@@ -13,6 +13,7 @@ const PROVIDER_CHOICES: Array<{ name: string; value: ProviderType }> = [
   { name: 'Anthropic — API key from console.anthropic.com', value: 'anthropic' },
   { name: 'Google Vertex AI — Claude models via GCP', value: 'vertex' },
   { name: 'OpenAI — or any OpenAI-compatible endpoint', value: 'openai' },
+  { name: 'OpenCode — route LLM calls through OpenCode CLI', value: 'opencode' },
 ];
 
 /**
@@ -90,6 +91,13 @@ export async function runInteractiveProviderSetup(options?: {
       }
       config.baseUrl = await promptInput('Base URL (leave empty for OpenAI, or enter custom endpoint):') || undefined;
       config.model = await promptInput(`Model (default: ${DEFAULT_MODELS.openai}):`) || DEFAULT_MODELS.openai;
+      break;
+    }
+    case 'opencode': {
+      config.model = '';
+      console.log(chalk.dim('  LLM calls will be routed through OpenCode CLI.'));
+      console.log(chalk.dim('  Will use OpenCode\'s default model from your opencode.jsonc config.'));
+      console.log(chalk.dim('  Ensure OpenCode is installed and authenticated: ') + chalk.hex('#83D1EB')('opencode auth login'));
       break;
     }
   }
