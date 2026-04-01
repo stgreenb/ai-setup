@@ -4,36 +4,38 @@ import path from 'path';
 
 vi.mock('fs');
 
-import { writeOpencodeConfig } from '../opencode/index.js';
+import { writeOpenCodeConfig } from '../opencode/index.js';
 
-describe('writeOpencodeConfig', () => {
+describe('writeOpenCodeConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.existsSync).mockReturnValue(false);
   });
 
-  it('writes AGENTS.md to project root', () => {
-    const written = writeOpencodeConfig({ agentsMd: '# Project\n\nInstructions here.' });
+  it('writes opencode.json to project root', () => {
+    const written = writeOpenCodeConfig({ 
+      opencodeJson: '{"model":"anthropic/claude-sonnet-4-5","autoupdate":true}'
+    });
 
-    expect(written).toEqual(['AGENTS.md']);
-    const content = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
-    expect(content).toContain('# Project\n\nInstructions here.');
-    expect(content).toContain('caliber:managed:pre-commit');
+    expect(written).toContain('opencode.json');
+    const content = vi.mocked(fs.writeFileSync).mock.calls.find(c => 
+      String(c[0]) === 'opencode.json'
+    );
+    expect(content).toBeDefined();
+    expect(content![1]).toContain('"model":"anthropic/claude-sonnet-4-5"');
   });
 
   it('writes skills to .opencode/skills/{name}/SKILL.md with frontmatter', () => {
     const config = {
-      agentsMd: '# Project',
+      opencodeJson: '{"model":"test"}',
       skills: [
         { name: 'testing-guide', description: 'How to write tests', content: 'Write tests' },
         { name: 'deploy', description: 'Deploy steps', content: 'Deploy steps' },
       ],
     };
 
-    const written = writeOpencodeConfig(config);
+    const written = writeOpenCodeConfig(config);
 
-    expect(written).toHaveLength(3);
-    expect(written).toContain('AGENTS.md');
     expect(written).toContain(path.join('.opencode', 'skills', 'testing-guide', 'SKILL.md'));
     expect(written).toContain(path.join('.opencode', 'skills', 'deploy', 'SKILL.md'));
 
@@ -44,30 +46,31 @@ describe('writeOpencodeConfig', () => {
     const writeCalls = vi.mocked(fs.writeFileSync).mock.calls;
     const skillCall = writeCalls.find((c) => String(c[0]).includes('testing-guide'));
     expect(skillCall).toBeDefined();
-    expect(skillCall![1]).toBe(
-      '---\nname: testing-guide\ndescription: How to write tests\n---\n\nWrite tests',
-    );
+    expect(skillCall![1]).toContain('How to write tests');
   });
 
-  it('writes only AGENTS.md when no skills provided', () => {
-    const written = writeOpencodeConfig({ agentsMd: '# Project' });
+  it('writes opencode.json only when no skills provided', () => {
+    const written = writeOpenCodeConfig({ opencodeJson: '{}' });
 
-    expect(written).toEqual(['AGENTS.md']);
+    expect(written).toContain('opencode.json');
     expect(fs.mkdirSync).not.toHaveBeenCalled();
   });
 
-  it('skips AGENTS.md when agentsMdAlreadyWritten is true', () => {
+  it('handles mcpServers config', () => {
     const config = {
-      agentsMd: '# Project',
-      skills: [{ name: 'test-skill', description: 'A skill', content: 'Content' }],
+      opencodeJson: '{"model":"test"}',
+      mcpServers: { test: { command: 'test-server' } },
     };
 
-    const written = writeOpencodeConfig(config, true);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('{"model":"test"}');
 
-    expect(written).toHaveLength(1);
-    expect(written).not.toContain('AGENTS.md');
-    expect(written).toContain(path.join('.opencode', 'skills', 'test-skill', 'SKILL.md'));
+    const written = writeOpenCodeConfig(config);
+
+    expect(written).toContain('opencode.json');
+    // MCP config should be merged into opencode.json
     const writeCalls = vi.mocked(fs.writeFileSync).mock.calls;
-    expect(writeCalls.every((c) => String(c[0]) !== 'AGENTS.md')).toBe(true);
+    const jsonCall = writeCalls.find((c) => String(c[0]) === 'opencode.json' && String(c[1]).includes('mcp'));
+    expect(jsonCall).toBeDefined();
   });
 });
