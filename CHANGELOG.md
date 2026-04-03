@@ -1,3 +1,9 @@
+## v1.40.3 (2026-04-03)
+
+### Bug Fixes
+
+- prevent recursive feedback loop in learn system (#121)
+
 ## v1.40.2 (2026-04-03)
 
 ### Bug Fixes
