@@ -1,3 +1,9 @@
+## v1.41.2 (2026-04-13)
+
+### Bug Fixes
+
+- isCaliberRunning falsely detects current process as another caliber instance (#151)
+
 ## v1.41.1 (2026-04-08)
 
 ### Bug Fixes
