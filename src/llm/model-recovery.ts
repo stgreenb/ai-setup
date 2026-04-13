@@ -27,6 +27,7 @@ const KNOWN_MODELS: Record<ProviderType, string[]> = {
   openai: ['gpt-5.4-mini', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
   cursor: ['auto', 'composer-1.5'],
   'claude-cli': [],
+  opencode: [],
 };
 
 /**

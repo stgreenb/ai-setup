@@ -12,6 +12,7 @@ export const DEFAULT_MODELS: Record<ProviderType, string> = {
   openai: 'gpt-5.4-mini',
   cursor: 'sonnet-4.6',
   'claude-cli': 'default',
+  opencode: 'default',
 };
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -104,6 +105,14 @@ export function resolveFromEnv(): LLMConfig | null {
     };
   }
 
+  // Prefer OpenCode (uses opencode CLI; no API key)
+  if (process.env.CALIBER_USE_OPENCODE === '1' || process.env.CALIBER_USE_OPENCODE === 'true') {
+    return {
+      provider: 'opencode',
+      model: process.env.CALIBER_MODEL || DEFAULT_MODELS.opencode,
+    };
+  }
+
   return null;
 }
 
@@ -114,7 +123,9 @@ export function readConfigFile(): LLMConfig | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (
       !parsed.provider ||
-      !['anthropic', 'vertex', 'openai', 'cursor', 'claude-cli'].includes(parsed.provider as string)
+      !['anthropic', 'vertex', 'openai', 'cursor', 'claude-cli', 'opencode'].includes(
+        parsed.provider as string,
+      )
     ) {
       return null;
     }
@@ -144,6 +155,9 @@ export function getConfigFilePath(): string {
 export function getDisplayModel(config: { provider: string; model: string }): string {
   if (config.model === 'default' && config.provider === 'claude-cli') {
     return process.env.ANTHROPIC_MODEL || 'default (inherited from Claude Code)';
+  }
+  if (config.model === 'default' && config.provider === 'opencode') {
+    return process.env.ANTHROPIC_MODEL || 'default (inherited from OpenCode)';
   }
   return config.model;
 }
